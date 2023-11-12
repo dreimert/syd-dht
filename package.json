@@ -1,0 +1,17 @@
+{
+  "name": "syd-chord",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "TD de DHT du cours de systèmes distribués du département à l'INSA Lyon.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Damien Reimert",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "got": "^13.0.0",
+    "yargs": "^17.7.2"
+  }
+}
