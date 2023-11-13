@@ -4,7 +4,8 @@ import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import got from 'got'
 
-const argv = yargs(hideBin(process.argv)) // Analyse des paramètres
+// Analyse des arguments et des options. Permet de produire l'aide aussi
+const argv = yargs(hideBin(process.argv))
   .command('get <key>', 'Récupère la valeur associé à la clé')
   .command('put <key> <value>', 'Place une association clé / valeur')
   .command('lookup <key>', 'Renvoie le nœud responsable de la clef')
@@ -37,14 +38,17 @@ if (argv._[0] === 'version') {
   process.exit(0) // met fin au programme
 }
 
+// Fonction utilitaire pour afficher les messages utilisateur en fonction de l'option --bot
 function info (msg) {
   if (!argv.bot) {
     console.info(msg)
   }
 }
 
+// Construction de l'url de base du nœud à contacter
 const baseUrl = `${argv.url}:${argv.port}`
 
+// Fonction utilitaire pour gérer les réponses des requêtes
 async function handleResponse (request) {
   try {
     const { body } = await request
@@ -54,6 +58,7 @@ async function handleResponse (request) {
   }
 }
 
+// Gestion des commandes
 switch (argv._[0]) {
   case 'get':
     info(`Commande get ${argv.key} =>`)

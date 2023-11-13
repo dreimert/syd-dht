@@ -5,11 +5,13 @@ import bodyParser from 'body-parser'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import crypto from 'crypto'
+import got from 'got' // Utile pour faire des requêtes HTTP
 
+// Gestion des options
 const argv = yargs(hideBin(process.argv))
   .options({
     port: {
-      description: "Port d'écoute du noeud",
+      description: "Port d'écoute du nœuds",
       alias: 'p',
       default: 4000,
     },
@@ -23,14 +25,17 @@ const argv = yargs(hideBin(process.argv))
   })
   .parse()
 
+// Initialisation du serveur HTTP
 const app = express()
 // @ts-ignore
 const port = argv.port
 
+// Initialisation de la base de données
 const db = {
   test: "Hello World!", // Exemple d'initialisation, permet les premiers tests
 }
 
+// Initialisation de la configuration du nœud
 const config = {
   port,
   url: `http://localhost:${port}`,
@@ -45,7 +50,7 @@ const config = {
   },
 }
 
-// Pour exemple
+// Pour exemple d'un hash classique
 function getHash(data) {
   return crypto.createHash('sha1').update(data, 'utf8').digest('hex');
 }
@@ -65,9 +70,12 @@ function getIdFromString(data, m = argv.size) {
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
 
+// Route pour la racine, pour tester le serveur par exemple. Vous pouvez mettre ce que vous voulez ici.
 app.get('/', (req, res) => {
   res.send('Hello World!')
 })
+
+// Routes pour les commandes du nœud
 
 app.get('/db/:key', (req, res) => {
   console.log('GET /db', req.params.key)
@@ -114,6 +122,8 @@ app.post('/add', (req, res) => {
 
   res.json('TODO')
 })
+
+// Lancement du serveur
 
 console.log(`Server try run on port ${port}`)
 

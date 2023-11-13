@@ -222,7 +222,7 @@ Il faut aussi implémenter la commande `add` qui doit :
 
 Vous pouvez vérifier via le CLI ou votre navigateur que le successeur et le prédécesseur du nœud 4000 sont bien le nœud 4001.
 
-### Trouver le ~~~coupable~~~ responsable
+### Trouver le ~~coupable~~ responsable
 
 Vous avez deux nœuds sur l'anneau. Normalement, si vous avez utilisé les port 4000 et 4001 et que vous hachez l'url, ils ont respectivement les ids 47 et 17. Le nœud 4000 à pour id 47 et est responsable des clefs entre son prédécesseur et lui soit des clefs entre 18 et 47 et le nœud 4001 est responsable des clefs entre 48 et 17. Pour le moment, les nœuds ne savent pas qui est responsable de quelle clef. Il faut donc implémenter la commande `lookup` qui permet de trouver le nœud responsable d'une clef.
 
