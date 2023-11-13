@@ -129,6 +129,8 @@ Si vous allez sur `http://localhost:4000/db/test`, vous devriez voir la valeur `
 
 ## Implémentation
 
+Durand ce TD, vous ne devez modifier que le fichier `index.js`.
+
 La première chose à faire est l'implémentation du calcul de l'identifiant du nœud. On veut deux propriétés principale pour cette fonction :
 
 * Elle doit être déterministe. C'est à dire que pour une URL donnée, elle doit toujours renvoyer la même valeur.
@@ -184,19 +186,29 @@ Pour le moment, notre nœud est tout seul sur l'anneau. Il faut donc qu'il rejoi
 
 #### Commencez par lancer un deuxième nœud sur le port 4001
 
+Pour vérifier qu'il fonctionne, regardez les logs du serveur et allez sur `http://localhost:4001/config/id`.
+
 Les deux nœud doivent maintenant communiquer. Via le CLI, vous pouvez faire :
 
     node cli.js --port 4001 join http://localhost:4000
 
 pour demander au nœud 4001 de rejoindre le réseau du nœud 4000. Malheureusement, la commande n'est pas implémentée au niveau du serveur. Let's go !
 
-Pour le moment, on va se limiter à deux nœuds. Ce que doit faire la commande dans ce cas :
+Pour le moment, on va se limiter à deux nœuds. Ce que doit faire la commande `join` dans ce cas :
 
 - Appeler la commande `add` du nœud cible pour lui dire qu'il va rejoindre le réseau.
 - Et déclarer le nœud cible comme successeur et prédécesseur.
 - Copier les clefs dont le nœud est responsable.
 
 Et c'est tout ;)
+
+Si je déroule l’exécution de la commande `join` :
+
+- Le CLI contacte le nœud 4001 via la commande `join`.
+- Le nœud 4001 contacte le nœud 4000 via la commande `add`.
+    - Le nœud 4000 met à jour son successeur et son prédécesseur avec nœud 4001 dans la commande `add`.
+- Le nœud 4001 met à jour son successeur et son prédécesseur avec le nœud 4000.
+- Le nœud 4001 copie les clefs dont il est responsable sur le nœud 4000 à l'aide de la commande `keys`.
 
 #### Implémentez la commande join à deux nœuds
 
