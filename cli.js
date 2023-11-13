@@ -69,6 +69,11 @@ switch (argv._[0]) {
       body: JSON.stringify({ value: argv.value })
     }))
     break
+  case 'keys':
+    info(`Commande keys =>`)
+
+    await handleResponse(got(`${baseUrl}/keys`))
+    break
   case 'lookup':
     info(`lookup ${argv.key} =>`)
 

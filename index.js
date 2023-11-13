@@ -85,6 +85,12 @@ app.put('/db/:key', (req, res) => {
   res.json(true)
 })
 
+app.get('/keys', (req, res) => {
+  console.log('GET /keys')
+
+  res.json(Object.keys(db))
+})
+
 app.get('/lookup/:key', (req, res) => {
   console.log('GET /lookup', req.params.key)
 
