@@ -103,11 +103,11 @@ Dans notre DHT, les nœuds doivent supporter les opérations HTTP suivantes :
 
 * GET db \<key\>: Récupère la valeur associée à la clef key. Si le nœud n'est pas responsable de la clef, propage la demande au nœuds suivant et renvoie la réponse. Si la clef n'existe pas, renvoie une erreur 404.
 * PUT db \<key\> \<value\> : Associe la valeur value à la clef key. Si le nœud n'est pas responsable de la clef, propage la demande au nœuds suivant et renvoie la réponse.
-* GET keys : Récupère la liste des clefs. Si le nœud n'est pas responsable de la clef, propage la demande au nœuds suivant et renvoie la réponse. Si la clef n'existe pas, renvoie une erreur 404.
+* GET keys : Récupère la liste des clefs du nœud.
 * POST lookup \<key\> : Renvoie le nœud responsable de la clef key. Si le nœud est responsable de la clef, renvoie son url sinon propage la demande au nœuds suivant et renvoie la réponse.
 * POST join \<url\> : Demande au nœud de rejoindre le réseau du nœud cible de `url`.
 * POST add \<url\> : Déclare la présence d'un nouveau nœud sur le réseau qui a pour URL `url`. Si la valeur du nœud sur l'anneau est plus proche que le successeur ou le prédécesseur, il va venir le remplacer mais ne propage pas l'information.
-* GET config \<key\> : Permet de récupérer la configuration du nœuds qui pour key `key`. Par exemple pour récupérer le successeur du nœuds avec le port 4000, on fait un GET sur `http://localhost:4000/config/successor`.
+* GET config \<key\> : Permet de récupérer la valeur du paramètre `key` dans la configuration du nœuds. Par exemple pour récupérer le successeur du nœuds avec le port 4000, on fait un GET sur `http://localhost:4000/config/successor`.
 
 ## Code initial
 
