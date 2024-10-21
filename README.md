@@ -1,6 +1,6 @@
 # SYD : DHT (Distributed Hash Table)
 
-TD de DHT du cours de systèmes distribués du département à l'INSA Lyon.
+TD de DHT du cours de systèmes distribués du département TC à l'INSA Lyon.
 
 L'objectif de ce TD est de comprendre le fonctionnement d'une Distributed Hash Table (DHT) soit une table de hachage distribuée en français et de l'implémenter. Pour cela, nous allons utiliser le protocole Chord. Chord est un protocole de DHT qui permet d'associer une clef à un nœud sur un réseau pair à pair sans leader et où tous les nœuds sont égaux. Il permet de retrouver une donnée en O(log(n)). Vous pouvez trouver le papier original ici : https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf.
 
