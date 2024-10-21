@@ -1,8 +1,8 @@
-# SYD : DHT
+# SYD : DHT (Distributed Hash Table)
 
 TD de DHT du cours de systèmes distribués du département à l'INSA Lyon.
 
-L'objectif de ce TD est de comprendre le fonctionnement d'une DHT et de l'implémenter. Pour cela, nous allons utiliser le protocole Chord. Chord est un protocole de DHT qui permet d'associer une clef à un nœud sur un réseau pair à pair sans leader et où tous les nœuds sont égaux. Il permet de retrouver une donnée en O(log(n)). Vous pouvez trouver le papier original ici : https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf.
+L'objectif de ce TD est de comprendre le fonctionnement d'une Distributed Hash Table (DHT) soit une table de hachage distribuée en français et de l'implémenter. Pour cela, nous allons utiliser le protocole Chord. Chord est un protocole de DHT qui permet d'associer une clef à un nœud sur un réseau pair à pair sans leader et où tous les nœuds sont égaux. Il permet de retrouver une donnée en O(log(n)). Vous pouvez trouver le papier original ici : https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf.
 
 Je cite Wikipedia sur les avantages de Chord :
 
@@ -10,9 +10,9 @@ Je cite Wikipedia sur les avantages de Chord :
 * Passage à l'échelle : Le coût d'une recherche est fonction du logarithme du nombre de nœuds.
 * Équilibrage de charge : Équilibrage de charge naturel, hérité de la Fonction de hachage (SHA-1).
 * Disponibilité : On peut toujours trouver le nœud responsable d'une clef, même lorsque le système est instable.
-* Aucune contrainte sur le nom des clefs1.
+* Aucune contrainte sur le nom des clefs.
 
-Hum. Oups. Ça c'est le sujet que j'avais imaginé avant de me rendre compte que c'était trop compliqué pour un TD. On va implémenté une version un peu bancale d'une DHT mais dont l'objectif est de vous faire comprendre les grandes lignes. Pour simplifier, je vais rônier sur la propriété de passage à l'échelle. L'implémentation cible est une DHT qui permet de stocker des données sur un réseau pair à pair sans leader et où tous les nœuds sont égaux. Elle permet de retrouver une donnée en O(n) mais au prix d'un passage à l'échelle difficile et d'une très grande vulnérabilité aux attaques.
+Hum. Oups. Ça c'est le sujet que j'avais imaginé avant de me rendre compte que c'était trop compliqué pour un TD. On va implémenté une version un peu bancale d'une DHT mais dont l'objectif est de vous faire comprendre les grandes lignes. Pour simplifier, je vais rogner sur la propriété de passage à l'échelle. L'implémentation cible est une DHT qui permet de stocker des données sur un réseau pair à pair sans leader et où tous les nœuds sont égaux. Elle permet de retrouver une donnée en O(n) mais au prix d'un passage à l'échelle difficile et d'une très grande vulnérabilité aux attaques.
 
 ## Prérequis
 
@@ -91,20 +91,24 @@ Et pour lancer plusieurs fois le même fichier avec des paramètres différents,
     pm2 start monFichier.js --name Instance1
     pm2 start monFichier.js --name Instance2
 
+Pour afficher les logs :
+
+    pm2 log
+
 ## Protocole
 
-Une DHT est un réseau pair à pair qui permet d'associer une clef à un nœud. Pour cela, elle utilise une fonction de hachage qui permet de transformer une clef en une valeur numérique. Dans Chord, les nœuds sont disposés sur un anneau de taille 2<sup>m</sup>, `m` étant un paramètre du réseau. Un nœuds est responsable des clefs qui sont incluses entre lui est son prédécesseur sur l'anneau. Cette valeur numérique est ensuite utilisée pour trouver le nœud qui est responsable de cette clef. Pour cela, chaque nœud connait ses voisins et le nœud responsable de la clef. Lorsqu'un nœud reçoit une requête pour une clef, il regarde si c'est lui qui est responsable de la clef. Si c'est le cas, il renvoie la valeur associée à la clef. Sinon, il renvoie la requête à son voisin le plus proche de la clef. Si aucun nœud n'est responsable de la clef, la requête est renvoyée au nœud qui a la clef la plus proche de la clef demandée. Si la requête fait le tour de l'anneau, la clef n'existe pas.
+Une DHT est un réseau pair à pair qui permet d'associer une clef à un nœud. Pour cela, elle utilise une fonction de hachage qui permet de transformer une clef en une valeur numérique. Dans Chord, les nœuds sont disposés sur un anneau de taille 2<sup>m</sup>, `m` étant un paramètre du réseau. Ce `m` est fixe pour un réseau donné. **Un nœuds est responsable des clefs qui sont incluses entre lui et son prédécesseur sur l'anneau**. Cette valeur numérique est ensuite utilisée pour trouver le nœud qui est responsable de cette clef. Pour cela, chaque nœud connait ses voisins et le nœud responsable de la clef. Lorsqu'un nœud reçoit une requête pour une clef, il regarde si c'est lui qui est responsable de la clef. Si c'est le cas, il renvoie la valeur associée à la clef. Sinon, il renvoie la requête à son voisin le plus proche de la clef. Si aucun nœud n'est responsable de la clef, la requête est renvoyée au nœud qui a la clef la plus proche de la clef demandée. Si la requête fait le tour de l'anneau, la clef n'existe pas.
 
-Pour trouver le nœud responsable d'une clef, on utilise la fonction de hachage pour transformer la clef en valeur numérique. La fonction de hachage garantie que les clefs sont réparties uniformément sur l'anneau. On va utiliser ici SHA. On va faire de même avec l'IP ou dans notre cas l'URL du nœud. Nous n'utilisons pas l'IP mais le port car nous sommes sur une machine locale et que nous voulons avoir plusieurs nœuds sur la même machine.
+**Pour trouver le nœud responsable d'une clef, on utilise la fonction de hachage pour transformer la clef en valeur numérique**. La fonction de hachage garantie que les clefs sont réparties uniformément sur l'anneau. On va utiliser ici SHA. On va faire de même avec l'IP ou dans notre cas l'URL du nœud. Nous n'utilisons pas l'IP mais le port car nous sommes sur une machine locale et que nous voulons avoir plusieurs nœuds sur la même machine.
 
 Dans la vrai vie, utiliser l'IP pour calculer la valeur sur l'anneau empêche un attaquant de choisir la valeur de son nœud pour être responsable d'un grand nombre de clefs sauf si l'attaquant contrôle un grand nombre d'IP.
 
 Dans notre DHT, les nœuds doivent supporter les opérations HTTP suivantes :
 
-* GET db \<key\>: Récupère la valeur associée à la clef key. Si le nœud n'est pas responsable de la clef, propage la demande au nœuds suivant et renvoie la réponse. Si la clef n'existe pas, renvoie une erreur 404.
-* PUT db \<key\> \<value\> : Associe la valeur value à la clef key. Si le nœud n'est pas responsable de la clef, propage la demande au nœuds suivant et renvoie la réponse.
+* GET db \<key\>: Récupère la valeur associée à la clef *key*. Si le nœud n'est pas responsable de la clef, propage la demande au nœuds suivant et renvoie la réponse. Si la clef n'existe pas, renvoie une erreur 404.
+* PUT db \<key\> \<value\> : Associe la valeur *value* à la clef *key*. Si le nœud n'est pas responsable de la clef, propage la demande au nœuds suivant et renvoie la réponse.
 * GET keys : Récupère la liste des clefs du nœud.
-* POST lookup \<key\> : Renvoie le nœud responsable de la clef key. Si le nœud est responsable de la clef, renvoie son url sinon propage la demande au nœuds suivant et renvoie la réponse.
+* POST lookup \<key\> : Renvoie le nœud responsable de la clef *key*. Si le nœud est responsable de la clef, renvoie son url sinon propage la demande au nœuds suivant et renvoie la réponse.
 * POST join \<url\> : Demande au nœud de rejoindre le réseau du nœud cible de `url`.
 * POST add \<url\> : Déclare la présence d'un nouveau nœud sur le réseau qui a pour URL `url`. Si la valeur du nœud sur l'anneau est plus proche que le successeur ou le prédécesseur, il va venir le remplacer mais ne propage pas l'information.
 * GET config \<key\> : Permet de récupérer la valeur du paramètre `key` dans la configuration du nœuds. Par exemple pour récupérer le successeur du nœuds avec le port 4000, on fait un GET sur `http://localhost:4000/config/successor`.
@@ -129,7 +133,7 @@ Si vous allez sur `http://localhost:4000/db/test`, vous devriez voir la valeur `
 
 ## Implémentation
 
-Durand ce TD, vous ne devez modifier que le fichier `index.js`.
+**Durand ce TD, vous ne devez modifier que le fichier `index.js`**.
 
 La première chose à faire est l'implémentation du calcul de l'identifiant du nœud. On veut deux propriétés principale pour cette fonction :
 
@@ -178,7 +182,7 @@ Mais ici, c'est un entier sur l'anneau que je veux. Il suffit de récupérer les
 
 #### Mettez à jour le code du serveur pour que l'identifiant du nœud soit calculé à partir de l'URL et initialise correctement la configuration
 
-Vous pouvez vérifier via `http://localhost:4000/config/id`.
+Vous pouvez vérifier via `http://localhost:4000/config/id`. En cas de problème, `pm2 log` pour voir les logs ;).
 
 ### Briser la solitude
 
@@ -192,35 +196,40 @@ Les deux nœud doivent maintenant communiquer. Via le CLI, vous pouvez faire :
 
     node cli.js --port 4001 join http://localhost:4000
 
-pour demander au nœud 4001 de rejoindre le réseau du nœud 4000. Malheureusement, la commande n'est pas implémentée au niveau du serveur. Let's go !
+pour demander au nœud 4001 de rejoindre le réseau du nœud 4000. Malheureusement, la commande n'est pas implémentée au niveau du serveur. *Let's go !*
 
 Pour le moment, on va se limiter à deux nœuds. Ce que doit faire la commande `join` dans ce cas :
 
 - Appeler la commande `add` du nœud cible pour lui dire qu'il va rejoindre le réseau.
 - Et déclarer le nœud cible comme successeur et prédécesseur.
-- Copier les clefs dont le nœud est responsable.
+- Copier les clefs dont le nœud est responsable (cf. protocole).
 
 Et c'est tout ;)
 
-Si je déroule l’exécution de la commande `join` :
+Si je déroule l’exécution de la commande `join` : Le CLI contacte le nœud 4001 via la commande `join`.
 
-- Le CLI contacte le nœud 4001 via la commande `join`.
 - Le nœud 4001 contacte le nœud 4000 via la commande `add`.
     - Le nœud 4000 met à jour son successeur et son prédécesseur avec nœud 4001 dans la commande `add`.
 - Le nœud 4001 met à jour son successeur et son prédécesseur avec le nœud 4000.
-- Le nœud 4001 copie les clefs dont il est responsable sur le nœud 4000 à l'aide de la commande `keys`.
+- Le nœud 4001 demande les clefs dont est responsable le nœud 4000 à l'aide de la commande `keys`.
+- Il calcule l'identifiant des clefs et garde celle dont il est responsable (Cf. protocole).
+- Pour chaque clef dont il est responsable, il demande la valeur à 4000 et l'ajoute dans sa BDD.
+
+Commencez par implémenter la commande `add` qui doit :
+
+Vérifier si le nœud qui veut rejoindre le réseau est plus proche que le successeur ou le prédécesseur. Si c'est le cas, il doit le remplacer. Mais vu qu'il n'y a pas de successeur ou de prédécesseur, il suffit de mettre le nœud qui veut rejoindre le réseau comme successeur et comme prédécesseur.
+
+#### Implémentez la commande `add` à deux nœuds
+
+Via le CLI, vous pouvez similer l'appel à la commande `add`.
+
+Vous pouvez vérifier via le CLI ou votre navigateur que le successeur et le prédécesseur du nœud 4000 sont bien le nœud 4001 et inversement.
 
 #### Implémentez la commande join à deux nœuds
 
-Vous pouvez vérifier via le CLI ou votre navigateur que le successeur et le prédécesseur du nœud 4001 sont bien le nœud 4000. Et via les logs que le nœud 4000 a bien reçu la commande `add`.
+Vous pouvez vérifier via le CLI ou votre navigateur que le successeur et le prédécesseur du nœud 4001 sont bien le nœud 4000. Et via les logs que le nœud 4000 a bien reçu la commande `add` et s'est mis à jour.
 
-Il faut aussi implémenter la commande `add` qui doit :
-
-- Vérifier si le nœud qui veut rejoindre le réseau est plus proche que le successeur ou le prédécesseur. Si c'est le cas, il doit le remplacer. Mais vu qu'il n'y a pas de successeur ou de prédécesseur, il suffit de mettre le nœud qui veut rejoindre le réseau comme successeur et comme prédécesseur.
-
-#### Implémentez la commande add à deux nœuds
-
-Vous pouvez vérifier via le CLI ou votre navigateur que le successeur et le prédécesseur du nœud 4000 sont bien le nœud 4001.
+On ignore les clefs dans la base de donnée pour le moment.
 
 ### Trouver le ~~coupable~~ responsable
 
