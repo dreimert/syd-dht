@@ -114,6 +114,13 @@ app.get('/config/:key', (req, res) => {
 app.post('/join', (req, res) => {
   console.log('POST /join', req.body.url)
 
+  // Cf. cli.js pour plus d'exemples
+  // const res = await got.post({
+  //   url: `${req.body.url}/add`,
+  //   headers: { 'Content-Type': 'application/json' },
+  //   body: JSON.stringify({ url: config.url })
+  // })
+
   res.json('TODO')
 })
 
