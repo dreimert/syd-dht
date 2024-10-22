@@ -39,7 +39,6 @@ const db = {
 const config = {
   port,
   url: `http://localhost:${port}`,
-  id: 'TODO: Prenons un peu de <i>hash</i>',
   successor: {
     id: null,
     url: null,
@@ -49,6 +48,8 @@ const config = {
     url: null,
   },
 }
+
+config.id = 'TODO: Prenons un peu de <i>hash</i>'
 
 // Pour exemple d'un hash classique
 function getHash(data) {
