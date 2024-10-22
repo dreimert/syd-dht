@@ -72,6 +72,16 @@ function getIdFromString(data, m = config.size) {
   return parseInt(bitString, 2)
 }
 
+// Je vous donne la fonction, elle est un peu compliquée ;)
+// Indique si un identifiant est dans l'interval de responsabilité du nœud
+function idIsInInterval(id, start = config.predecessor.id + 1, end = config.id) {
+  if (start < end) {
+    return id > start && id <= end
+  } else {
+    return id > start || id <= end
+  }
+}
+
 // Pour parse les requêtes
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
@@ -108,6 +118,7 @@ app.get('/keys', (req, res) => {
 app.get('/lookup/:key', (req, res) => {
   console.log('GET /lookup', req.params.key)
 
+  // idIsInInterval peut vous être utile ;)
   res.json('TODO')
 })
 
