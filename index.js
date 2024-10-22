@@ -39,6 +39,8 @@ const db = {
 const config = {
   port,
   url: `http://localhost:${port}`,
+  // @ts-ignore
+  size: argv.size,
   successor: {
     id: null,
     url: null,
@@ -58,7 +60,7 @@ function getHash(data) {
 
 // Je vous donne la fonction, elle est un peu compliquée ;)
 // Convertie la clef vers un identifiant sur l'anneau de taille 2^m
-function getIdFromString(data, m = argv.size) {
+function getIdFromString(data, m = config.size) {
   // Calcul du hash et conversion en un buffer
   const buffer = crypto.createHash('sha1').update(data, 'utf8').digest()
   // Conversion du buffer en une chaine de m bits
