@@ -2,6 +2,7 @@
 
 import express from 'express'
 import bodyParser from 'body-parser'
+import cors from 'cors'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import crypto from 'crypto'
@@ -27,6 +28,8 @@ const argv = yargs(hideBin(process.argv))
 
 // Initialisation du serveur HTTP
 const app = express()
+// For viewer
+app.use(cors());
 // @ts-ignore
 const port = argv.port
 

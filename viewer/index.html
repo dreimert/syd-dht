@@ -1,0 +1,116 @@
+
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .commands {
+      display: flex;
+      margin: 20px;
+    }
+
+    .commands input {
+      padding: 5px;
+      margin-right: 10px;
+    }
+
+    .commands button {
+      padding: 5px;
+    }
+
+    canvas {
+      border: 1px solid black;
+    }
+  </style>
+</head>
+<body>
+  <div class="commands">
+    <input type="text" id="endpoint" value="http://localhost:4000" name="endpoint">
+    <button type="button" name="show" onclick="show()">Afficher</button>
+  </div>
+  <canvas id="canvas" height="796" width="796"></canvas>
+
+  <script type="text/javascript">
+    const center = { x: 398, y: 398 }
+    const radius = 380
+
+    /**
+     * @type {HTMLCanvasElement}
+     */
+    const canvas = document.getElementById('canvas')
+    const ctx = canvas.getContext('2d')
+
+    // Draw a circle in center
+    ctx.beginPath()
+    ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI)
+    ctx.stroke()
+    ctx.closePath()
+
+    function drawSmallCircle (x, y, color = 'red', size = 15) {
+      ctx.beginPath()
+      ctx.arc(x, y, size, 0, 2 * Math.PI)
+      ctx.fillStyle = color
+      ctx.fill()
+      ctx.closePath()
+    }
+
+    async function show () {
+      clean()
+
+      const endpoint = document.getElementById('endpoint').value
+
+      const size = await fetch(`${endpoint}/config/size`).then(response => response.json())
+      const nbPoints = Math.pow(2, size)
+      const angle = 2 * Math.PI / nbPoints
+
+      const urls = [endpoint]
+      const visited = new Set()
+
+      while (urls.length > 0) {
+        const url = urls.pop()
+
+        if (visited.has(url)) {
+          continue
+        }
+
+        visited.add(url)
+
+        const id = await fetch(`${url}/config/id`).then(response => response.json())
+
+        const x = center.x + radius * Math.cos(id * angle)
+        const y = center.y + radius * Math.sin(id * angle)
+
+        const successor = await fetch(`${url}/config/successor`).then(response => response.json()).then((successor) => successor.url)
+
+        if (successor) {
+          urls.push(successor)
+        }
+
+        const predecessor = await fetch(`${url}/config/predecessor`).then(response => response.json()).then((predecessor) => predecessor.url)
+
+        if (predecessor) {
+          urls.push(predecessor)
+        }
+
+        drawSmallCircle(x, y)
+      }
+
+    }
+
+    function clean () {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.beginPath()
+      ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI)
+      ctx.stroke()
+      ctx.closePath()
+    }
+
+  </script>
+</body>
+</html>
