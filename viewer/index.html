@@ -38,13 +38,18 @@
 
   <script type="text/javascript">
     const center = { x: 398, y: 398 }
-    const radius = 380
+    const radius = 340
+    const textRadius = 370
 
     /**
      * @type {HTMLCanvasElement}
      */
     const canvas = document.getElementById('canvas')
     const ctx = canvas.getContext('2d')
+
+    ctx.font = "24px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
 
     // Draw a circle in center
     ctx.beginPath()
@@ -99,6 +104,11 @@
         }
 
         drawSmallCircle(x, y)
+        ctx.fillText(
+          id,
+          center.x + textRadius * Math.cos(id * angle),
+          center.y + textRadius * Math.sin(id * angle)
+        );
       }
 
     }
