@@ -26,31 +26,32 @@ const argv = yargs(hideBin(process.argv))
   })
   .parse()
 
-// Initialisation du serveur HTTP
-const app = express()
-// For viewer
-app.use(cors());
-// @ts-ignore
-const port = argv.port
-
 // Initialisation de la base de données
 const db = {
   test: "Hello World!", // Exemple d'initialisation, permet les premiers tests
 }
 
+// Préparation de l'URL du nœud
+// @ts-ignore
+const size = argv.size
+// @ts-ignore
+const port = argv.port
+const url = `http://localhost:${port}`
+const id = getIdFromString(url) // 'Voir : Prenons un peu de <i>hash</i>'
+
 // Initialisation de la configuration du nœud
 const config = {
   port,
-  url: `http://localhost:${port}`,
-  // @ts-ignore
-  size: argv.size,
+  url,
+  id,
+  size,
   successor: {
-    id: null,
-    url: null,
+    id,
+    url,
   },
   predecessor: {
-    id: null,
-    url: null,
+    id,
+    url,
   },
 }
 
@@ -82,6 +83,10 @@ function idIsInInterval(id, start = config.predecessor.id + 1, end = config.id) 
   }
 }
 
+// Initialisation du serveur HTTP
+const app = express()
+// For viewer
+app.use(cors());
 // Pour parse les requêtes
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
@@ -93,13 +98,13 @@ app.get('/', (req, res) => {
 
 // Routes pour les commandes du nœud
 
-app.get('/db/:key', (req, res) => {
+app.get('/db/:key', async (req, res) => {
   console.log('GET /db', req.params.key)
 
   res.json(db[req.params.key])
 })
 
-app.put('/db/:key', (req, res) => {
+app.put('/db/:key', async (req, res) => {
   console.log('PUT /db', req.params.key, req.body.value)
 
   console.log('req', req);
@@ -115,20 +120,26 @@ app.get('/keys', (req, res) => {
   res.json(Object.keys(db))
 })
 
-app.get('/lookup/:key', (req, res) => {
-  console.log('GET /lookup', req.params.key)
-
+app.get('/lookup/:id(\\d+)', async (req, res) => {
+  console.log('GET /lookup', req.params.id)
+  
   // idIsInInterval peut vous être utile ;)
   res.json('TODO')
 })
 
 app.get('/config/:key', (req, res) => {
-  console.log('GET /config', req.params.key)
+  console.log('GET /config/', req.params.key)
 
   res.json(config[req.params.key])
 })
 
-app.post('/join', (req, res) => {
+app.get('/config', (req, res) => {
+  console.log('GET /config')
+
+  res.json(config)
+})
+
+app.post('/join', async (req, res) => {
   console.log('POST /join', req.body.url)
 
   // Cf. cli.js pour plus d'exemples
@@ -149,8 +160,8 @@ app.post('/add', (req, res) => {
 
 // Lancement du serveur
 
-console.log(`Server try run on port ${port}`)
+console.log(`Server try run on port ${config.port}`)
 
-app.listen(port, () => {
-  console.log(`Listening on port ${port}`)
+app.listen(config.port, () => {
+  console.log(`Listening on port ${config.port}`)
 })
