@@ -55,16 +55,26 @@ const config = {
   },
 }
 
-config.id = 'TODO: Prenons un peu de <i>hash</i>'
-
-// Pour exemple d'un hash classique
+/**
+ * Exemple de function qui prend une chaine de caractère et produit un hash sous forme d'une chaine hexadécimal
+ *
+ * @param {string} data la chaine de caractère à hasher
+ *
+ * @returns {string} le hash en hexadécimal
+ **/
 function getHash(data) {
   return crypto.createHash('sha1').update(data, 'utf8').digest('hex');
 }
 
 // Je vous donne la fonction, elle est un peu compliquée ;)
-// Convertie la clef vers un identifiant sur l'anneau de taille 2^m
-function getIdFromString(data, m = config.size) {
+/**
+ * Convertie la clef vers un identifiant sur l'anneau de taille 2^m
+ *
+ * @param {string} data la chaine de caractère à hasher
+ *
+ * @returns {number} l'identifiant sur l'anneau
+ **/
+function getIdFromString(data, m = size) {
   // Calcul du hash et conversion en un buffer
   const buffer = crypto.createHash('sha1').update(data, 'utf8').digest()
   // Conversion du buffer en une chaine de m bits
@@ -73,8 +83,16 @@ function getIdFromString(data, m = config.size) {
   return parseInt(bitString, 2)
 }
 
-// Je vous donne la fonction, elle est un peu compliquée ;)
-// Indique si un identifiant est dans l'interval de responsabilité du nœud
+// Je vous donne la fonction, elle est un peu compliquée aussi ;)
+/**
+ * Indique si un identifiant est dans l'interval de responsabilité du nœud
+ *
+ * @param {number} id l'identifiant à tester
+ * @param {number} start le début de l'intervalle
+ * @param {number} end la fin de l'intervalle
+ *
+ * @returns {boolean} vrai si l'identifiant est dans l'intervalle
+ **/
 function idIsInInterval(id, start = config.predecessor.id + 1, end = config.id) {
   if (start < end) {
     return id > start && id <= end
