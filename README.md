@@ -2,7 +2,9 @@
 
 TD de DHT du cours de systèmes distribués du département TC à l'INSA Lyon.
 
-L'objectif de ce TD est de comprendre le fonctionnement d'une Distributed Hash Table (DHT) soit une table de hachage distribuée en français et de l'implémenter. Pour cela, nous allons utiliser le protocole Chord. Chord est un protocole de DHT qui permet d'associer une clef à un nœud sur un réseau pair à pair sans leader et où tous les nœuds sont égaux. Il permet de retrouver une donnée en O(log(n)). Vous pouvez trouver le papier original ici : https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf.
+L'objectif de ce TD est de comprendre le fonctionnement d'une Distributed Hash Table (DHT) soit une table de hachage distribuée en français et de l'implémenter. Pour cela, nous allons partir d'un serveur de base de données minimaliste pour arriver à une base de données distribuée. Nous utiliserons le protocole Chord.
+
+Chord est un protocole de DHT qui permet d'associer une clef à un nœud sur un réseau pair à pair sans leader et où tous les nœuds sont égaux. Il permet de retrouver une donnée en O(log(n)). Vous pouvez trouver le papier original ici : https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf.
 
 Je cite Wikipedia sur les avantages de Chord :
 
@@ -62,6 +64,8 @@ Pour lancer un processus Node.js :
 
     pm2 start monFichier.js
 
+Si vous ne souhaitez pas l'installer globalement, vous pouvez l'installer localement (sans le `-g`) et utiliser la commande `npx` pour l'exécuter : `npx pm2 start monFichier.js`.
+
 En développement, vous allez préférez utiliser l'option `--watch` qui permet de redémarrer le processus à chaque modification du fichier :
 
     pm2 start monFichier.js --watch
@@ -95,13 +99,15 @@ Pour afficher les logs :
 
     pm2 log
 
-## Protocole
+## Description technique
 
-Une DHT est un réseau pair à pair qui permet d'associer une clef à un nœud. Pour cela, elle utilise une fonction de hachage qui permet de transformer une clef en une valeur numérique. Dans Chord, les nœuds sont disposés sur un anneau de taille 2<sup>m</sup>, `m` étant un paramètre du réseau. Ce `m` est fixe pour un réseau donné. **Un nœuds est responsable des clefs qui sont incluses entre lui et son prédécesseur sur l'anneau**. Cette valeur numérique est ensuite utilisée pour trouver le nœud qui est responsable de cette clef. Pour cela, chaque nœud connait ses voisins et le nœud responsable de la clef. Lorsqu'un nœud reçoit une requête pour une clef, il regarde si c'est lui qui est responsable de la clef. Si c'est le cas, il renvoie la valeur associée à la clef. Sinon, il renvoie la requête à son voisin le plus proche de la clef. Si aucun nœud n'est responsable de la clef, la requête est renvoyée au nœud qui a la clef la plus proche de la clef demandée. Si la requête fait le tour de l'anneau, la clef n'existe pas.
+Une DHT est un réseau pair à pair qui permet d'associer une clef à un nœud. Pour cela, elle utilise une fonction de hachage qui permet de transformer une clef en une valeur numérique. Dans Chord, les nœuds sont disposés sur un **anneau** de taille 2<sup>m</sup>, `m` étant un paramètre du réseau. Ce `m` est fixe pour un réseau donné. **Un nœuds est responsable des clefs qui sont incluses entre lui et son prédécesseur sur l'anneau**. Cette valeur numérique est ensuite utilisée pour trouver le nœud qui est responsable de cette clef. Pour cela, chaque nœud connait ses voisins et le nœud responsable de la clef. Lorsqu'un nœud reçoit une requête pour une clef, il regarde si c'est lui qui est responsable de la clef. Si c'est le cas, il renvoie la valeur associée à la clef. Sinon, il renvoie la requête à son voisin le plus proche de la clef. Si aucun nœud n'est responsable de la clef, la requête est renvoyée au nœud qui a la clef la plus proche de la clef demandée. Si la requête fait le tour de l'anneau, la clef n'existe pas.
 
 **Pour trouver le nœud responsable d'une clef, on utilise la fonction de hachage pour transformer la clef en valeur numérique**. La fonction de hachage garantie que les clefs sont réparties uniformément sur l'anneau. On va utiliser ici SHA. On va faire de même avec l'IP ou dans notre cas l'URL du nœud. Nous n'utilisons pas l'IP mais le port car nous sommes sur une machine locale et que nous voulons avoir plusieurs nœuds sur la même machine.
 
 Dans la vrai vie, utiliser l'IP pour calculer la valeur sur l'anneau empêche un attaquant de choisir la valeur de son nœud pour être responsable d'un grand nombre de clefs sauf si l'attaquant contrôle un grand nombre d'IP.
+
+## Protocole
 
 Dans notre DHT, les nœuds doivent supporter les opérations HTTP suivantes :
 
@@ -109,17 +115,17 @@ Dans notre DHT, les nœuds doivent supporter les opérations HTTP suivantes :
 * PUT db \<key\> \<value\> : Associe la valeur *value* à la clef *key*. Si le nœud n'est pas responsable de la clef, propage la demande au nœuds suivant et renvoie la réponse.
 * GET keys : Récupère la liste des clefs du nœud.
 * POST lookup \<key\> : Renvoie le nœud responsable de la clef *key*. Si le nœud est responsable de la clef, renvoie son url sinon propage la demande au nœuds suivant et renvoie la réponse.
-* POST join \<url\> : Demande au nœud de rejoindre le réseau du nœud cible de `url`.
+* POST join \<url\> : Demande au nœud de rejoindre le réseau DHT du nœud cible de `url`.
 * POST add \<url\> : Déclare la présence d'un nouveau nœud sur le réseau qui a pour URL `url`. Si la valeur du nœud sur l'anneau est plus proche que le successeur ou le prédécesseur, il va venir le remplacer mais ne propage pas l'information.
 * GET config \<key\> : Permet de récupérer la valeur du paramètre `key` dans la configuration du nœuds. Par exemple pour récupérer le successeur du nœuds avec le port 4000, on fait un GET sur `http://localhost:4000/config/successor`.
 
 ## Code initial
 
-Vous pouvez voir dans `index.js` qu'il y a déjà du code. Ce code permet de lancer un serveur HTTP sur le port passé en paramètre. Pour lancer le code, il faut faire :
+Vous pouvez voir dans `index.js` qu'il y a déjà du code. Ce code est une base de donnée minimaliste et permet de lancer un serveur HTTP sur le port passé en paramètre. Pour lancer le code, il faut faire :
 
     node index.js --port 4000
 
-Les fonctions de base de données sont déjà implémentées ainsi que celle de lecture de la configuration. Vous pouvez par exemple lancer le serveur et aller sur `http://localhost:4000/db/test` pour voir la valeur associée.
+Les fonctions de base de données sont déjà implémentées ainsi que celle de lecture de la configuration. Vous pouvez par exemple lancer le serveur et aller sur `http://localhost:4000/db/test` pour voir la valeur associée. Il y a quelques fonctions qui vous seront utiles pour la suite.
 
 J'ai aussi codé un client qui permet d’interagir avec le serveur. Vous pouvez le lancer avec :
 
@@ -231,9 +237,13 @@ Vous pouvez vérifier via le CLI ou votre navigateur que le successeur et le pr�
 
 On ignore les clefs dans la base de donnée pour le moment.
 
+### Viewer
+
+Pour vous simplifier la vie, vous pouvez lancer le viewer : `npm run viewer`.
+
 ### Trouver le ~~coupable~~ responsable
 
-Vous avez deux nœuds sur l'anneau. Normalement, si vous avez utilisé les port 4000 et 4001 et que vous hachez l'url, ils ont respectivement les ids 47 et 17. Le nœud 4000 à pour id 47 et est responsable des clefs entre son prédécesseur et lui soit des clefs entre 18 et 47 et le nœud 4001 est responsable des clefs entre 48 et 17. Pour le moment, les nœuds ne savent pas qui est responsable de quelle clef. Il faut donc implémenter la commande `lookup` qui permet de trouver le nœud responsable d'une clef.
+Vous avez deux nœuds sur l'anneau. Normalement, si vous avez utilisé les port 4000 et 4001 et que vous hachez l'url, ils ont respectivement les ids 47 et 17. Le nœud 4000 a pour id 47 et est responsable des clefs entre son prédécesseur et lui soit des clefs entre 18 et 47 et le nœud 4001 est responsable des clefs entre 48 et 17. Pour le moment, les nœuds ne savent pas qui est responsable de quelle clef. Il faut donc implémenter la commande `lookup` qui permet de trouver le nœud responsable d'une clef.
 
 Pour vous aider :
 
@@ -242,15 +252,27 @@ Pour vous aider :
 
 #### Implémentez la commande lookup
 
+Pour tester :
+    node cli.js lookup Bob # => 4000
+    node cli.js lookup Alice # => 4001
+
 ### Stocker des données au bon endroit
 
 Maintenant que vous savez qui est responsable de quelle clef, il faut stocker les données au bon endroit. Pour cela, il faut modifier les implémentations des commandes `get` et `put`.
 
 #### Implémentez les commandes get et put
 
+Pour tester :
+    node cli.js put Bob Bob # => Doit enregistrer sur 4000
+    node cli.js put Alice Alice # => Doit enregistrer sur 4001
+
+    node cli.js get Alice
+
+Utilisez les logs pour savoir où passe les requêtes et sur quelles machines sont stocker les données.
+
 ### Plus on est de fous, plus on rit
 
-Vous avez maintenant un réseau de deux nœuds. Il faut maintenant que vous puissiez ajouter plus de nœuds au réseau. Pour cela, il faut modifier la commande `join` pour qu'elle puisse ajouter un nœud au réseau quelque soit ça taille. Ce que doit faire la commande dans ce cas :
+Vous avez maintenant un réseau de deux nœuds. Il faut maintenant que vous puissiez ajouter plus de nœuds au réseau. Pour cela, il faut modifier la commande `join` pour qu'elle puisse ajouter un nœud au réseau quelque soit sa taille. Ce que doit faire la commande dans ce cas :
 
 - Appeler la commande `lookup` du nœud cible pour récupérer le nœud responsable de la valeur du nœud appelant sur l'anneau.
 - Appeler la commande `add` du nœud responsable.
