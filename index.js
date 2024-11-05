@@ -37,7 +37,7 @@ const size = argv.size
 // @ts-ignore
 const port = argv.port
 const url = `http://localhost:${port}`
-const id = getIdFromString(url) // 'Voir : Prenons un peu de <i>hash</i>'
+const id = 'Voir : Prenons un peu de <i>hash</i>'
 
 // Initialisation de la configuration du nœud
 const config = {
