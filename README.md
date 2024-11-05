@@ -227,11 +227,11 @@ Vérifier si le nœud qui veut rejoindre le réseau est plus proche que le succe
 
 #### Implémentez la commande `add` à deux nœuds
 
-Via le CLI, vous pouvez similer l'appel à la commande `add`.
+Via le CLI, vous pouvez simuler l'appel à la commande `add`.
 
 Vous pouvez vérifier via le CLI ou votre navigateur que le successeur et le prédécesseur du nœud 4000 sont bien le nœud 4001 et inversement.
 
-#### Implémentez la commande join à deux nœuds
+#### Implémentez la commande `join` à deux nœuds
 
 Vous pouvez vérifier via le CLI ou votre navigateur que le successeur et le prédécesseur du nœud 4001 sont bien le nœud 4000. Et via les logs que le nœud 4000 a bien reçu la commande `add` et s'est mis à jour.
 
