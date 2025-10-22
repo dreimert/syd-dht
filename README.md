@@ -264,6 +264,7 @@ Maintenant que vous savez qui est responsable de quelle clef, il faut stocker le
 #### Implémentez les commandes get et put
 
 Pour tester :
+
     node cli.js put Bob Bob # => Doit enregistrer sur 4000
     node cli.js put Alice Alice # => Doit enregistrer sur 4001
 
