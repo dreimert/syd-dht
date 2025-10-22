@@ -253,6 +253,7 @@ Pour vous aider :
 #### Implémentez la commande lookup
 
 Pour tester :
+
     node cli.js lookup Bob # => 4000
     node cli.js lookup Alice # => 4001
 
