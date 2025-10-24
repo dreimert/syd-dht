@@ -4,7 +4,7 @@ TD de DHT du cours de systèmes distribués du département TC à l'INSA Lyon.
 
 L'objectif de ce TD est de comprendre le fonctionnement d'une Distributed Hash Table (DHT) soit une table de hachage distribuée en français et de l'implémenter. Pour cela, nous allons partir d'un serveur de base de données minimaliste pour arriver à une base de données distribuée. Nous utiliserons le protocole Chord.
 
-Chord est un protocole de DHT qui permet d'associer une clef à un nœud sur un réseau pair à pair sans leader et où tous les nœuds sont égaux. Il permet de retrouver une donnée en O(log(n)). Vous pouvez trouver le papier original ici : https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf.
+Chord est un protocole de DHT qui permet d'associer une clef, à un nœud sur un réseau pair à pair sans leader et où tous les nœuds sont égaux. La chef est une chaine de caractère quelconque. Il permet de retrouver une clef en O(log(n)). Vous pouvez trouver le papier original ici : https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf.
 
 Je cite Wikipedia sur les avantages de Chord :
 
@@ -101,7 +101,7 @@ Pour afficher les logs :
 
 ## Description technique
 
-Une DHT est un réseau pair à pair qui permet d'associer une clef à un nœud. Pour cela, elle utilise une fonction de hachage qui permet de transformer une clef en une valeur numérique. Dans Chord, les nœuds sont disposés sur un **anneau** de taille 2<sup>m</sup>, `m` étant un paramètre du réseau. Ce `m` est fixe pour un réseau donné. **Un nœuds est responsable des clefs qui sont incluses entre lui et son prédécesseur sur l'anneau**. Cette valeur numérique est ensuite utilisée pour trouver le nœud qui est responsable de cette clef. Pour cela, chaque nœud connait ses voisins et le nœud responsable de la clef. Lorsqu'un nœud reçoit une requête pour une clef, il regarde si c'est lui qui est responsable de la clef. Si c'est le cas, il renvoie la valeur associée à la clef. Sinon, il renvoie la requête à son voisin le plus proche de la clef. Si aucun nœud n'est responsable de la clef, la requête est renvoyée au nœud qui a la clef la plus proche de la clef demandée. Si la requête fait le tour de l'anneau, la clef n'existe pas.
+Une DHT est un réseau pair à pair qui permet d'associer une clef à un nœud. Pour cela, elle utilise une fonction de hachage qui permet de transformer une clef en une valeur numérique. Dans Chord, les nœuds sont disposés sur un **anneau** de taille 2<sup>m</sup>, `m` étant un paramètre du réseau. Ce `m` est fixe pour un réseau donné. **Un nœuds est responsable des clefs dont la conversation en valeur numérique est incluse entre lui et son prédécesseur sur l'anneau**. Cette valeur numérique est ensuite utilisée pour trouver le nœud qui est responsable de cette clef. Pour cela, chaque nœud connait ses voisins. Lorsqu'un nœud reçoit une requête pour une clef, il regarde si c'est lui qui est responsable de la clef. Si c'est le cas, il renvoie la valeur associée à la clef. Sinon, il renvoie la requête à son successeur sur l'anneau. Si la requête fait le tour de l'anneau, la clef n'existe pas.
 
 **Pour trouver le nœud responsable d'une clef, on utilise la fonction de hachage pour transformer la clef en valeur numérique**. La fonction de hachage garantie que les clefs sont réparties uniformément sur l'anneau. On va utiliser ici SHA. On va faire de même avec l'IP ou dans notre cas l'URL du nœud. Nous n'utilisons pas l'IP mais le port car nous sommes sur une machine locale et que nous voulons avoir plusieurs nœuds sur la même machine.
 
@@ -248,7 +248,7 @@ Vous avez deux nœuds sur l'anneau. Normalement, si vous avez utilisé les port 
 Pour vous aider :
 
 - POST lookup \<key\> : Renvoie le nœud responsable de la clef key. Si le nœud est responsable de la clef, renvoie son url sinon propage la demande au nœuds suivant et renvoie la réponse.
-- Vous pouvez observer le code du CLI pour voir il fait des requêtes HTTP.
+- Vous pouvez observer le code du CLI pour voir comme il fait des requêtes HTTP.
 
 #### Implémentez la commande lookup
 
@@ -277,8 +277,8 @@ Utilisez les logs pour savoir où passe les requêtes et sur quelles machines so
 Vous avez maintenant un réseau de deux nœuds. Il faut maintenant que vous puissiez ajouter plus de nœuds au réseau. Pour cela, il faut modifier la commande `join` pour qu'elle puisse ajouter un nœud au réseau quelque soit sa taille. Ce que doit faire la commande dans ce cas :
 
 - Appeler la commande `lookup` du nœud cible pour récupérer le nœud responsable de la valeur du nœud appelant sur l'anneau.
-- Appeler la commande `add` du nœud responsable.
 - Récupérer le prédécesseur du nœud responsable.
+- Appeler la commande `add` du nœud responsable.
 - Appeler la commande `add` du prédécesseur.
 - Mettez à jour le successeur et le prédécesseur du nœud appelant.
 - Copier les clefs dont le nœud est responsable.
