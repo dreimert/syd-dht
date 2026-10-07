@@ -6,12 +6,13 @@ import got from 'got'
 
 // Analyse des arguments et des options. Permet de produire l'aide aussi
 const argv = yargs(hideBin(process.argv))
-  .command('get <key>', 'Récupère la valeur associé à la clé')
+  .command('get <key>', 'Récupère la valeur associée à la clef')
   .command('put <key> <value>', 'Place une association clé / valeur')
+  .command('keys', 'Liste les clefs stockées sur le nœud')
   .command('lookup <key>', 'Renvoie le nœud responsable de la clef')
   .command('join <nodeUrl>', "Demande au nœud de rejoindre le réseau du nœud cible")
   .command('add <nodeUrl>', "Déclare la présence d'un nouveau nœud")
-  .command('config <key>', 'Permet de récupérer la valeur key de la configuration du nœuds')
+  .command('config <key>', 'Permet de récupérer la valeur key de la configuration du nœud')
   .command('version', 'Demande la version du CLI')
   .option('url', {
     alias: 'u',
@@ -32,7 +33,7 @@ const argv = yargs(hideBin(process.argv))
   .help()
   .argv
 
-// Si l'utilisateur demande la verion
+// Si l'utilisateur demande la version
 if (argv._[0] === 'version') {
   console.log('1.0.0')
   process.exit(0) // met fin au programme
@@ -54,7 +55,12 @@ async function handleResponse (request) {
     const { body } = await request
     info(body)
   } catch (error) {
-    console.error('ERROR:', error)
+    if (error.response) {
+      // Le serveur a répondu avec un code d'erreur (404, 500...)
+      console.error(`ERROR ${error.response.statusCode}:`, error.response.body)
+    } else {
+      console.error('ERROR:', error)
+    }
   }
 }
 

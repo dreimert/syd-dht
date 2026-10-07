@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import express from 'express'
-import bodyParser from 'body-parser'
 import cors from 'cors'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
@@ -12,7 +11,7 @@ import got from 'got' // Utile pour faire des requêtes HTTP
 const argv = yargs(hideBin(process.argv))
   .options({
     port: {
-      description: "Port d'écoute du nœuds",
+      description: "Port d'écoute du nœud",
       alias: 'p',
       default: 4000,
     },
@@ -56,7 +55,7 @@ const config = {
 }
 
 /**
- * Exemple de function qui prend une chaine de caractère et produit un hash sous forme d'une chaine hexadécimal
+ * Exemple de fonction qui prend une chaîne de caractères et produit un hash sous forme d'une chaîne hexadécimale
  *
  * @param {string} data la chaine de caractère à hasher
  *
@@ -68,7 +67,7 @@ function getHash(data) {
 
 // Je vous donne la fonction, elle est un peu compliquée ;)
 /**
- * Convertie la clef vers un identifiant sur l'anneau de taille 2^m
+ * Convertit la clef vers un identifiant sur l'anneau de taille 2^m
  *
  * @param {string} data la chaine de caractère à hasher
  *
@@ -85,15 +84,15 @@ function getIdFromString(data, m = size) {
 
 // Je vous donne la fonction, elle est un peu compliquée aussi ;)
 /**
- * Indique si un identifiant est dans l'interval de responsabilité du nœud
+ * Indique si un identifiant est dans l'intervalle de responsabilité du nœud, soit ]start, end]
  *
  * @param {number} id l'identifiant à tester
- * @param {number} start le début de l'intervalle
- * @param {number} end la fin de l'intervalle
+ * @param {number} start le début de l'intervalle (exclu)
+ * @param {number} end la fin de l'intervalle (inclus)
  *
  * @returns {boolean} vrai si l'identifiant est dans l'intervalle
  **/
-function idIsInInterval(id, start = config.predecessor.id + 1, end = config.id) {
+function idIsInInterval(id, start = config.predecessor.id, end = config.id) {
   if (start < end) {
     return id > start && id <= end
   } else {
@@ -106,8 +105,8 @@ const app = express()
 // For viewer
 app.use(cors());
 // Pour parse les requêtes
-app.use(bodyParser.json())
-app.use(bodyParser.urlencoded({ extended: true }))
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 
 // Route pour la racine, pour tester le serveur par exemple. Vous pouvez mettre ce que vous voulez ici.
 app.get('/', (req, res) => {
@@ -119,13 +118,15 @@ app.get('/', (req, res) => {
 app.get('/db/:key', async (req, res) => {
   console.log('GET /db', req.params.key)
 
+  if (!Object.hasOwn(db, req.params.key)) {
+    return res.status(404).json(`Clef ${req.params.key} introuvable`)
+  }
+
   res.json(db[req.params.key])
 })
 
 app.put('/db/:key', async (req, res) => {
   console.log('PUT /db', req.params.key, req.body.value)
-
-  console.log('req', req);
 
   db[req.params.key] = req.body.value
 
@@ -138,10 +139,10 @@ app.get('/keys', (req, res) => {
   res.json(Object.keys(db))
 })
 
-app.get('/lookup/:id(\\d+)', async (req, res) => {
-  console.log('GET /lookup', req.params.id)
-  
-  // idIsInInterval peut vous être utile ;)
+app.get('/lookup/:key', async (req, res) => {
+  console.log('GET /lookup', req.params.key)
+
+  // getIdFromString et idIsInInterval peuvent vous être utiles ;)
   res.json('TODO')
 })
 
