@@ -1,52 +1,294 @@
-
 <!doctype html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
+  <title>Viewer Chord</title>
   <style>
     body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      margin: 0 16px;
+      font-family: system-ui, sans-serif;
     }
 
     .commands {
       display: flex;
-      margin: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 0;
     }
 
     .commands input {
       padding: 5px;
-      margin-right: 10px;
     }
 
     .commands button {
       padding: 5px;
     }
 
+    #status {
+      color: grey;
+    }
+
+    /* Le panneau passe sous l'anneau quand la fenêtre est trop étroite */
     .row {
       display: flex;
-      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 16px;
     }
 
+    .ring-column {
+      flex: 0 1 796px;
+      min-width: 0;
+    }
+
+    .ring {
+      position: relative;
+    }
+
+    /* L'anneau rétrécit pour tenir en largeur comme en hauteur */
     canvas {
+      display: block;
+      box-sizing: border-box;
+      width: min(100%, calc(100vh - 90px));
+      min-width: 300px;
+      height: auto;
+      margin: 0 auto;
       border: 1px solid black;
-      margin-bottom: auto;
     }
 
-    #configs {
-      margin-left: 12px;
+    #tooltip {
+      position: absolute;
+      display: none;
+      padding: 4px 8px;
+      border: 1px solid #888;
+      background: rgba(255, 255, 255, 0.95);
+      font: 13px monospace;
+      white-space: pre;
+      pointer-events: none;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 32px;
+      box-sizing: border-box;
+      width: min(100%, calc(100vh - 90px));
+      min-width: 300px;
+      margin: 12px auto 0;
+      font-size: 14px;
+      color: #222;
+    }
+
+    .legend h4 {
+      margin: 0 0 4px;
+      font-size: 14px;
+    }
+
+    .legend ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .legend li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      line-height: 1.7;
+    }
+
+    .legend svg {
+      flex: none;
+    }
+
+    .legend .hint {
+      flex-basis: 100%;
+      margin: 4px 0 0;
+      color: #555;
+    }
+
+    #panel {
+      flex: 1 1 360px;
+      max-width: 560px;
+      min-width: 0;
+    }
+
+    #details pre {
+      overflow-x: auto;
+    }
+
+    #summary {
+      margin-top: 0;
+    }
+
+    .ok {
+      color: green;
+    }
+
+    .error {
+      color: #c00;
+    }
+
+    #problems li {
+      margin-bottom: 4px;
+      cursor: pointer;
+    }
+
+    .lookup {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .lookup input {
+      padding: 5px;
+    }
+
+    #lookupResult {
+      min-height: 1.2em;
+    }
+
+    /* Le tableau défile plutôt que d'élargir la page */
+    .table {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 3px 6px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    tbody tr {
+      cursor: pointer;
+    }
+
+    tbody tr:hover {
+      background: #f3f3f3;
+    }
+
+    tbody tr.selected {
+      background: #e6f0ff;
+    }
+
+    tbody tr.dead {
+      color: grey;
+    }
+
+    .swatch {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .copy {
+      color: grey;
+      font-style: italic;
     }
   </style>
 </head>
 <body>
   <div class="commands">
-    <input type="text" id="entryPoint" value="http://localhost:4000" name="entryPoint">
-    <button type="button" name="show" onclick="show()">Afficher</button>
+    <input type="text" id="entryPoint" value="http://localhost:4000" name="entryPoint" size="30">
+    <button type="button" id="show">Afficher</button>
+    <span id="status"></span>
   </div>
   <div class="row">
-    <canvas id="canvas" height="796" width="796"></canvas>
-    <div id="configs"></div>
+    <div class="ring-column">
+      <div class="ring">
+        <canvas id="canvas" height="796" width="796"></canvas>
+        <div id="tooltip"></div>
+      </div>
+      <div class="legend">
+        <div>
+          <h4>Liens</h4>
+          <ul>
+            <li>
+              <svg width="36" height="12"><line x1="2" y1="6" x2="27" y2="6" stroke="#999" stroke-width="2"/><path d="M34 6 L25 2 L25 10 Z" fill="#999"/></svg>
+              successeur cohérent
+            </li>
+            <li>
+              <svg width="36" height="12"><line x1="2" y1="6" x2="27" y2="6" stroke="red" stroke-width="2.5"/><path d="M34 6 L25 2 L25 10 Z" fill="red"/></svg>
+              successeur incohérent
+            </li>
+            <li>
+              <svg width="36" height="12"><line x1="2" y1="6" x2="27" y2="6" stroke="orange" stroke-width="2" stroke-dasharray="5 4"/><path d="M34 6 L25 2 L25 10 Z" fill="orange"/></svg>
+              prédécesseur incohérent
+            </li>
+            <li>
+              <svg width="36" height="12"><line x1="2" y1="6" x2="27" y2="6" stroke="grey" stroke-width="1.5" stroke-dasharray="5 4"/><path d="M34 6 L25 2 L25 10 Z" fill="grey"/></svg>
+              vers un nœud injoignable
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h4>Nœuds</h4>
+          <ul>
+            <li>
+              <svg width="36" height="16"><circle cx="18" cy="8" r="7" fill="hsl(137, 70%, 40%)"/></svg>
+              nœud et son intervalle, même couleur
+            </li>
+            <li>
+              <svg width="36" height="16"><circle cx="18" cy="8" r="7" fill="red"/></svg>
+              collision (plusieurs nœuds)
+            </li>
+            <li>
+              <svg width="36" height="16"><circle cx="18" cy="8" r="7" fill="lightgrey"/></svg>
+              nœud injoignable ✝
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h4>Clefs</h4>
+          <ul>
+            <li>
+              <svg width="36" height="12"><rect x="14" y="2" width="8" height="8" fill="hsl(137, 70%, 40%)"/></svg>
+              chez son responsable (sa couleur)
+            </li>
+            <li>
+              <svg width="36" height="12"><rect x="14" y="2" width="8" height="8" fill="red"/></svg>
+              absente chez son responsable
+            </li>
+            <li>
+              <svg width="36" height="12"><rect x="14" y="2" width="8" height="8" fill="grey"/></svg>
+              responsable injoignable
+            </li>
+          </ul>
+        </div>
+        <p class="hint">Survolez un nœud ou une clef pour le détail, cliquez sur un nœud pour le sélectionner.</p>
+      </div>
+    </div>
+    <div id="panel">
+      <h2 id="summary"></h2>
+      <div id="problems"></div>
+      <h3>Tester lookup</h3>
+      <div class="lookup">
+        <input type="text" id="lookupKey" placeholder="Clef, par exemple Bob">
+        <button type="button" id="lookup">Tester</button>
+      </div>
+      <p id="lookupResult"></p>
+      <h3>Nœuds</h3>
+      <div class="table">
+        <table>
+          <thead>
+            <tr><th></th><th>id</th><th>nœud</th><th>préd.</th><th>succ.</th><th>clefs</th><th>état</th></tr>
+          </thead>
+          <tbody id="nodes"></tbody>
+        </table>
+      </div>
+      <div id="details"></div>
+    </div>
   </div>
   <script src="index.js"></script>
 </body>

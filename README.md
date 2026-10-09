@@ -204,9 +204,11 @@ Vous pouvez vérifier via `http://localhost:4000/config/id`. En cas de problème
 
 ### Viewer
 
-Pour vous simplifier la vie, j'ai codé un viewer. Dans un autre terminal, lancez `npm run viewer` puis ouvrez http://localhost:3000. Indiquez l'URL d'un nœud et cliquez sur *Afficher* : le viewer parcourt l'anneau en suivant successeurs et prédécesseurs, et dessine chaque nœud avec son intervalle de responsabilité. Il ne fonctionne qu'une fois l'identifiant du nœud calculé.
+Pour vous simplifier la vie, j'ai codé un viewer. Dans un autre terminal, lancez `npm run viewer` puis ouvrez http://localhost:3000. Indiquez l'URL d'un nœud et cliquez sur *Afficher* : le viewer parcourt l'anneau en suivant successeurs et prédécesseurs, et dessine chaque nœud avec son intervalle de responsabilité, ses liens vers son successeur et les clefs qu'il stocke.
 
-Gardez-le ouvert pendant tout le TD et cliquez sur *Afficher* après chaque `join` : si l'anneau dessiné ne correspond pas à ce que vous attendez, un `add` ou un `join` est faux.
+Il vérifie aussi l'anneau et liste les problèmes trouvés : identifiant non calculé ou différent du hash de l'URL, collision, successeur et prédécesseur qui ne se correspondent pas, nœud mal placé, voisin injoignable, clef absente chez son responsable. Les liens incohérents sont dessinés en rouge ou en orange. Le champ *Tester lookup* compare la réponse de votre `lookup` au responsable attendu.
+
+Gardez-le ouvert pendant tout le TD et cliquez sur *Afficher* après chaque `join` : si le viewer signale un problème, un `add` ou un `join` est faux.
 
 ### Briser la solitude
 
