@@ -1,13 +1,16 @@
 // Viewer de l'anneau : parcourt les nœuds à partir d'un point d'entrée, vérifie que
 // successeurs, prédécesseurs et clefs sont cohérents, puis dessine l'anneau.
 
+// Taille logique du canvas, indépendante de la densité de pixels de l'écran
+const canvasSize = 796
 const center = { x: 398, y: 398 }
-const radius = 340
-const textRadius = 375
-const keyRadius = 318
-const responsibilityRadius = 295
-const nodeSize = 15
+const radius = 310
+const textRadius = 350
+const keyRadius = 290
+const responsibilityRadius = 268
 const maxListed = 30
+// Durée pendant laquelle un nœud qui vient d'arriver est mis en évidence
+const newNodeDuration = 20000
 
 /**
  * @type { HTMLCanvasElement }
@@ -29,6 +32,10 @@ const lookupInput = document.getElementById('lookupKey')
  * @type { HTMLButtonElement }
  */ // @ts-ignore
 const showButton = document.getElementById('show')
+/**
+ * @type { HTMLSelectElement }
+ */ // @ts-ignore
+const refreshSelect = document.getElementById('refresh')
 const tooltip = document.getElementById('tooltip')
 const statusEl = document.getElementById('status')
 const summaryEl = document.getElementById('summary')
@@ -36,9 +43,6 @@ const problemsEl = document.getElementById('problems')
 const nodesEl = document.getElementById('nodes')
 const detailsEl = document.getElementById('details')
 const lookupResultEl = document.getElementById('lookupResult')
-
-ctx.textAlign = 'center'
-ctx.textBaseline = 'middle'
 
 // Hacher les clefs nécessite un contexte sécurisé : ouvrir le viewer via http://localhost
 const canHash = Boolean(globalThis.crypto?.subtle)
@@ -51,6 +55,14 @@ let selectedUrl = null
 let lookup = null
 // Incrémenté à chaque exploration, pour ignorer les résultats d'une exploration dépassée
 let generation = 0
+// Point d'entrée de l'anneau affiché, réutilisé par l'actualisation automatique
+let currentEntry = null
+let refreshTimer = null
+// Date à laquelle chaque nœud est apparu, pour mettre en évidence les nouveaux
+/** @type { Map<string, number> } */
+const firstSeen = new Map()
+// Rayon des nœuds, réduit quand ils sont nombreux
+let nodeSize = 15
 
 function shortUrl (url) {
   return String(url).replace(/^https?:\/\//, '')
@@ -71,9 +83,18 @@ function el (tag, text, className) {
   return element
 }
 
+// L'anneau commence en haut et tourne dans le sens des aiguilles d'une montre
+function angleOf (id) {
+  return id * 2 * Math.PI / state.nbPoints - Math.PI / 2
+}
+
 function position (id, r = radius) {
-  const angle = id * 2 * Math.PI / state.nbPoints
+  const angle = angleOf(id)
   return { x: center.x + r * Math.cos(angle), y: center.y + r * Math.sin(angle) }
+}
+
+function isNew (node) {
+  return Date.now() - (firstSeen.get(node.url) ?? 0) < newNodeDuration
 }
 
 // Même calcul que getIdFromString dans index.js
@@ -93,11 +114,13 @@ async function fetchJson (url) {
   }
 }
 
+// Interroge les nœuds vague par vague : tous les voisins découverts à une vague
+// sont interrogés en parallèle à la suivante
 async function exploreDht (entryPoint) {
   /**
    * @type { { url: string, id?: number }[] }
    */
-  const urls = [{ url: entryPoint }]
+  let wave = [{ url: entryPoint }]
   const visited = new Set()
   /**
    * @type { {
@@ -115,37 +138,40 @@ async function exploreDht (entryPoint) {
    **/
   const deadNodes = []
 
-  while (urls.length > 0) {
-    const { url, id } = urls.pop()
-
-    if (visited.has(url)) {
-      continue
+  while (wave.length > 0) {
+    for (const { url } of wave) {
+      visited.add(url)
     }
 
-    visited.add(url)
+    const configs = await Promise.all(wave.map(({ url }) => fetchJson(`${url}/config`)))
+    const next = []
 
-    const config = await fetchJson(`${url}/config`)
+    for (const [i, { url, id }] of wave.entries()) {
+      const config = configs[i]
 
-    if (typeof config !== 'object' || config === null) {
-      deadNodes.push({ url, id, dead: true })
-      continue
-    }
-
-    // Le point d'entrée a pu être saisi autrement que l'URL annoncée par le nœud
-    if (config.url !== url) {
-      if (visited.has(config.url)) {
+      if (typeof config !== 'object' || config === null) {
+        deadNodes.push({ url, id, dead: true })
         continue
       }
-      visited.add(config.url)
-    }
 
-    nodes.push(config)
+      // Le point d'entrée a pu être saisi autrement que l'URL annoncée par le nœud
+      if (config.url !== url) {
+        if (visited.has(config.url)) {
+          continue
+        }
+        visited.add(config.url)
+      }
 
-    for (const neighbour of [config.successor, config.predecessor]) {
-      if (neighbour?.url) {
-        urls.push(neighbour)
+      nodes.push(config)
+
+      for (const neighbour of [config.successor, config.predecessor]) {
+        if (neighbour?.url && !visited.has(neighbour.url) && !next.some(other => other.url === neighbour.url)) {
+          next.push(neighbour)
+        }
       }
     }
+
+    wave = next
   }
 
   return { entryPoint, nodes, deadNodes }
@@ -394,20 +420,18 @@ function drawSmallCircle (x, y, color, size = nodeSize) {
   ctx.fill()
 }
 
-function drawOutline (id, color) {
+function drawOutline (id, color, gap = 5, width = 3) {
   const { x, y } = position(id)
   ctx.save()
   ctx.beginPath()
-  ctx.arc(x, y, nodeSize + 5, 0, 2 * Math.PI)
+  ctx.arc(x, y, nodeSize + gap, 0, 2 * Math.PI)
   ctx.strokeStyle = color
-  ctx.lineWidth = 3
+  ctx.lineWidth = width
   ctx.stroke()
   ctx.restore()
 }
 
 function drawResponsibilities () {
-  const angle = 2 * Math.PI / state.nbPoints
-
   for (const [i, node] of state.sorted.entries()) {
     const predecessorId = node.predecessor?.id
 
@@ -415,10 +439,17 @@ function drawResponsibilities () {
       continue
     }
 
+    // Intervalle ]prédécesseur, nœud] : l'arc commence un peu après le prédécesseur
+    // et finit un peu après le nœud. Le décalage vaut une position de l'anneau,
+    // mais au moins 0,04 rad pour rester visible sur un grand anneau.
+    const start = angleOf(predecessorId)
+    const span = ((angleOf(node.id) - start) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) || 2 * Math.PI
+    const shift = Math.min(Math.max(2 * Math.PI / state.nbPoints, 0.04), span / 0.8)
+
     ctx.save()
     ctx.beginPath()
     // Rayons alternés : deux intervalles qui se chevauchent restent visibles
-    ctx.arc(center.x, center.y, responsibilityRadius - (i % 2) * 7, (predecessorId + 0.7) * angle, (node.id + 0.3) * angle)
+    ctx.arc(center.x, center.y, responsibilityRadius - (i % 2) * 7, start + 0.7 * shift, start + span + 0.3 * shift)
     ctx.strokeStyle = state.colors.get(node.url)
     ctx.lineWidth = node.url === selectedUrl ? 6 : 3
     ctx.stroke()
@@ -496,30 +527,100 @@ function drawLinks () {
   }
 }
 
+// Place les étiquettes autour de l'anneau. Dans une grappe de nœuds proches,
+// elles s'écartent le long du cercle juste assez pour ne pas se chevaucher.
+function placeLabels (labels) {
+  const items = [...labels].sort((a, b) => a.id - b.id)
+  const height = parseInt(ctx.font)
+
+  for (const item of items) {
+    item.width = ctx.measureText(item.text).width
+    item.angle = angleOf(item.id)
+  }
+
+  // Écart minimal, en radians, entre deux étiquettes voisines : en haut et en bas
+  // elles sont côte à côte (largeur), sur les côtés l'une au-dessus de l'autre (hauteur)
+  const minGap = (a, b) => {
+    const middle = (a.angle + b.angle) / 2
+    const across = (a.width + b.width) / 2 + 6
+    const along = height + 2
+    const needed = Math.min(across / Math.max(Math.abs(Math.sin(middle)), 0.01), along / Math.max(Math.abs(Math.cos(middle)), 0.01))
+    return needed / textRadius
+  }
+
+  // Relaxation : on écarte les paires trop proches, en gardant l'ordre de l'anneau
+  for (let iteration = 0; iteration < 200 && items.length > 1; iteration++) {
+    let moved = false
+
+    for (let i = 0; i < items.length; i++) {
+      const a = items[i]
+      const b = items[(i + 1) % items.length]
+      const gap = i === items.length - 1 ? b.angle + 2 * Math.PI - a.angle : b.angle - a.angle
+      const deficit = minGap(a, b) - gap
+
+      if (deficit > 0.0001) {
+        a.angle -= deficit / 2
+        b.angle += deficit / 2
+        moved = true
+      }
+    }
+
+    if (!moved) {
+      break
+    }
+  }
+
+  for (const item of items) {
+    item.x = Math.min(Math.max(center.x + textRadius * Math.cos(item.angle), item.width / 2 + 2), canvasSize - item.width / 2 - 2)
+    item.y = Math.min(Math.max(center.y + textRadius * Math.sin(item.angle), height / 2 + 2), canvasSize - height / 2 - 2)
+    item.moved = Math.abs(item.angle - angleOf(item.id)) * textRadius > 4
+  }
+
+  return items
+}
+
 function drawNodes () {
   ctx.save()
-  ctx.font = '20px Arial'
+  // Police plus petite pour les identifiants longs d'un grand anneau
+  ctx.font = state.nbPoints > 1000 ? '15px Arial' : '20px Arial'
+
+  const labels = []
 
   for (const node of state.deadPlaced) {
     const { x, y } = position(node.id)
-    const text = position(node.id, textRadius)
     drawSmallCircle(x, y, 'lightgrey')
-    ctx.fillStyle = 'grey'
-    ctx.fillText(`${node.id} ✝`, text.x, text.y)
+    labels.push({ id: node.id, text: `${node.id} ✝`, color: 'grey' })
   }
 
   for (const [id, group] of state.byId) {
     const { x, y } = position(id)
-    const text = position(id, textRadius)
     const collision = group.length > 1
 
+    if (group.some(isNew)) {
+      drawOutline(id, 'gold', 9, 5)
+    }
+
     drawSmallCircle(x, y, collision ? 'red' : state.colors.get(group[0].url))
-    ctx.fillStyle = collision ? 'red' : 'black'
-    ctx.fillText(collision ? `${id} ×${group.length}` : `${id}`, text.x, text.y)
+    labels.push({ id, text: collision ? `${id} ×${group.length}` : `${id}`, color: collision ? 'red' : 'black' })
 
     if (group.some(node => node.url === selectedUrl)) {
       drawOutline(id, 'black')
     }
+  }
+
+  for (const item of placeLabels(labels)) {
+    // Trait de rappel vers le nœud pour une étiquette déplacée
+    if (item.moved) {
+      const from = position(item.id, radius + nodeSize + 1)
+      ctx.strokeStyle = '#aaa'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(from.x, from.y)
+      ctx.lineTo(center.x + (textRadius - 12) * Math.cos(item.angle), center.y + (textRadius - 12) * Math.sin(item.angle))
+      ctx.stroke()
+    }
+    ctx.fillStyle = item.color
+    ctx.fillText(item.text, item.x, item.y)
   }
 
   ctx.restore()
@@ -561,13 +662,31 @@ function drawLookup () {
   }
 }
 
+// Adapte la résolution du canvas à l'écran (Retina, zoom du navigateur) pour un dessin net
+function fitCanvas () {
+  const ratio = window.devicePixelRatio || 1
+  const size = Math.round(canvasSize * ratio)
+
+  if (canvas.width !== size) {
+    canvas.width = size
+    canvas.height = size
+  }
+
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+}
+
 function render () {
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  fitCanvas()
+  ctx.clearRect(0, 0, canvasSize, canvasSize)
   drawRing()
 
   if (!state || (state.sorted.length === 0 && state.deadPlaced.length === 0)) {
     return
   }
+
+  nodeSize = state.sorted.length + state.deadPlaced.length > 16 ? 10 : 15
 
   drawResponsibilities()
   drawKeys()
@@ -653,10 +772,14 @@ function renderTable () {
     swatch.append(el('span', '', 'swatch'))
     // @ts-ignore
     swatch.firstChild.style.background = state.colors.get(node.url)
+    const urlCell = el('td', shortUrl(node.url))
+    if (isNew(node)) {
+      urlCell.append(el('span', 'nouveau', 'new'))
+    }
     addRow(node, [
       swatch,
       el('td', String(node.id)),
-      el('td', shortUrl(node.url)),
+      urlCell,
       neighbourCell(node.predecessor),
       neighbourCell(node.successor),
       keysCell(node),
@@ -783,8 +906,8 @@ function hitTest (event) {
 
   const rect = canvas.getBoundingClientRect()
   const point = {
-    x: (event.clientX - rect.left) * canvas.width / rect.width,
-    y: (event.clientY - rect.top) * canvas.height / rect.height,
+    x: (event.clientX - rect.left) * canvasSize / rect.width,
+    y: (event.clientY - rect.top) * canvasSize / rect.height,
   }
   const near = (id, r, distance) => {
     const { x, y } = position(id, r)
@@ -866,21 +989,56 @@ canvas.addEventListener('click', event => {
 
 // Commandes
 
-function setLoading (loading) {
-  showButton.disabled = loading
-  statusEl.textContent = loading ? 'Exploration de l\'anneau…' : ''
+// Reflète le point d'entrée et l'actualisation dans l'adresse, pour la partager ou la garder en favori
+function updateAddress () {
+  const params = new URLSearchParams()
+
+  if (currentEntry) {
+    params.set('node', currentEntry)
+  }
+
+  if (refreshSelect.value !== '0') {
+    params.set('refresh', refreshSelect.value)
+  }
+
+  history.replaceState(null, '', `?${params}`)
 }
 
-async function show () {
-  const run = ++generation
+function scheduleRefresh () {
+  clearTimeout(refreshTimer)
+
+  const seconds = Number(refreshSelect.value)
+
+  if (seconds > 0 && currentEntry) {
+    refreshTimer = setTimeout(() => display(currentEntry), seconds * 1000)
+  }
+}
+
+// Affiche l'anneau du point d'entrée saisi
+function show () {
   const entryPoint = entryInput.value.trim().replace(/\/+$/, '')
 
   try {
     localStorage.setItem('entryPoint', entryPoint)
   } catch {}
-  history.replaceState(null, '', `?node=${encodeURIComponent(entryPoint)}`)
 
-  setLoading(true)
+  return display(entryPoint)
+}
+
+async function display (entryPoint) {
+  const run = ++generation
+  // Réafficher le même anneau, à la main ou par l'actualisation, ne fait pas clignoter la page
+  const sameRing = state?.entryPoint === entryPoint
+
+  clearTimeout(refreshTimer)
+  currentEntry = entryPoint
+  updateAddress()
+
+  if (!sameRing) {
+    firstSeen.clear()
+    showButton.disabled = true
+    statusEl.textContent = 'Exploration de l\'anneau…'
+  }
 
   try {
     const data = await exploreDht(entryPoint)
@@ -895,11 +1053,26 @@ async function show () {
       return
     }
 
+    // Les nœuds présents au premier affichage ne sont pas « nouveaux »
+    const now = sameRing ? Date.now() : 0
+    for (const node of analysis?.sorted ?? []) {
+      if (!firstSeen.has(node.url)) {
+        firstSeen.set(node.url, now)
+      }
+    }
+
+    // Un test de lookup terminé reste affiché, avec le responsable attendu dans le nouvel anneau
+    if (!sameRing || !analysis?.sorted.length) {
+      lookup = null
+    } else if (lookup && !lookup.pending) {
+      lookup.expected = analysis.responsible(lookup.id)
+    }
+
     state = analysis
-    lookup = null
     renderLookup()
     render()
     renderPanel()
+    statusEl.textContent = `Mis à jour à ${new Date().toLocaleTimeString('fr-FR')}`
 
     if (!state) {
       summaryEl.className = 'error'
@@ -907,7 +1080,8 @@ async function show () {
     }
   } finally {
     if (run === generation) {
-      setLoading(false)
+      showButton.disabled = false
+      scheduleRefresh()
     }
   }
 }
@@ -971,14 +1145,26 @@ lookupInput.addEventListener('keydown', event => {
     testLookup()
   }
 })
+refreshSelect.addEventListener('change', () => {
+  updateAddress()
+  scheduleRefresh()
+})
+// Le zoom ou le passage sur un autre écran change la densité de pixels
+window.addEventListener('resize', render)
 
 // Point d'entrée : ?node=… dans l'adresse, sinon le dernier utilisé
-const nodeParam = new URLSearchParams(location.search).get('node')
+const params = new URLSearchParams(location.search)
+const nodeParam = params.get('node')
 
 try {
   entryInput.value = nodeParam ?? localStorage.getItem('entryPoint') ?? entryInput.value
 } catch {
   entryInput.value = nodeParam ?? entryInput.value
+}
+
+// Actualisation : ?refresh=5 dans l'adresse, par exemple pour le vidéoprojecteur
+if ([...refreshSelect.options].some(option => option.value === params.get('refresh'))) {
+  refreshSelect.value = params.get('refresh')
 }
 
 render()

@@ -208,7 +208,7 @@ Pour vous simplifier la vie, j'ai codé un viewer. Dans un autre terminal, lance
 
 Il vérifie aussi l'anneau et liste les problèmes trouvés : identifiant non calculé ou différent du hash de l'URL, collision, successeur et prédécesseur qui ne se correspondent pas, nœud mal placé, voisin injoignable, clef absente chez son responsable. Les liens incohérents sont dessinés en rouge ou en orange. Le champ *Tester lookup* compare la réponse de votre `lookup` au responsable attendu.
 
-Gardez-le ouvert pendant tout le TD et cliquez sur *Afficher* après chaque `join` : si le viewer signale un problème, un `add` ou un `join` est faux.
+Gardez-le ouvert pendant tout le TD et cliquez sur *Afficher* après chaque `join`, ou choisissez *Actualiser toutes les 5 s* : si le viewer signale un problème, un `add` ou un `join` est faux. Les nœuds qui viennent d'arriver sont entourés en jaune.
 
 ### Briser la solitude
 
@@ -359,7 +359,7 @@ Recommencez en faisant rejoindre 4003 (id 60) via 4001 : il doit s'insérer entr
 
 ## L'anneau de la promo
 
-Votre DHT marche sur votre machine ? Faisons-en une seule pour toute la salle. L'enseignant lance un nœud d'amorçage et affiche le viewer au vidéoprojecteur : l'anneau grandit à chaque nouvel arrivant.
+Votre DHT marche sur votre machine ? Faisons-en une seule pour toute la salle. L'enseignant lance un nœud d'amorçage et affiche le viewer au vidéoprojecteur, actualisé automatiquement (`http://localhost:3000/?node=http://<IP de l'enseignant>:4000&refresh=5`) : l'anneau grandit à chaque nouvel arrivant.
 
 Le nœud d'amorçage utilise les mêmes options que les autres, sinon il annonce `localhost` et l'anneau est cassé dès le premier `join` :
 

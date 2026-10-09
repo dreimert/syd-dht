@@ -192,6 +192,14 @@
       border-radius: 50%;
     }
 
+    .new {
+      margin-left: 6px;
+      padding: 0 5px;
+      border-radius: 4px;
+      background: gold;
+      font-size: 12px;
+    }
+
     .copy {
       color: grey;
       font-style: italic;
@@ -202,6 +210,15 @@
   <div class="commands">
     <input type="text" id="entryPoint" value="http://localhost:4000" name="entryPoint" size="30">
     <button type="button" id="show">Afficher</button>
+    <label>
+      Actualiser
+      <select id="refresh">
+        <option value="0">jamais</option>
+        <option value="2">toutes les 2 s</option>
+        <option value="5">toutes les 5 s</option>
+        <option value="10">toutes les 10 s</option>
+      </select>
+    </label>
     <span id="status"></span>
   </div>
   <div class="row">
@@ -246,6 +263,10 @@
             <li>
               <svg width="36" height="16"><circle cx="18" cy="8" r="7" fill="lightgrey"/></svg>
               nœud injoignable ✝
+            </li>
+            <li>
+              <svg width="36" height="22"><circle cx="18" cy="11" r="9" fill="none" stroke="gold" stroke-width="3"/><circle cx="18" cy="11" r="5" fill="hsl(137, 70%, 40%)"/></svg>
+              nouveau nœud (20 s)
             </li>
           </ul>
         </div>
