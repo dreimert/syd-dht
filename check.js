@@ -5,6 +5,7 @@
 
 import { spawn } from 'child_process'
 import crypto from 'crypto'
+import net from 'net'
 
 const file = process.argv[2] ?? 'index.js'
 const size = 6
@@ -15,14 +16,6 @@ function getIdFromString(data, m = size) {
   const buffer = crypto.createHash('sha1').update(data, 'utf8').digest()
   const bitString = Array.from(buffer).map(byte => byte.toString(2).padStart(8, '0')).join('').slice(-m)
   return parseInt(bitString, 2)
-}
-
-function idIsInInterval(id, start, end) {
-  if (start < end) {
-    return id > start && id <= end
-  } else {
-    return id > start || id <= end
-  }
 }
 
 // Choix de ports dont les identifiants sont tous différents
@@ -57,7 +50,20 @@ for (const node of nodes) {
 // Gestion des nœuds lancés par le vérificateur
 const processes = new Map()
 
+function portIsFree(port) {
+  return new Promise(resolve => {
+    const server = net.createServer()
+    server.once('error', () => resolve(false))
+    server.listen(port, () => server.close(() => resolve(true)))
+  })
+}
+
 async function start(node) {
+  // Sinon, c'est le nœud déjà présent sur le port qui serait testé
+  if (!await portIsFree(node.port)) {
+    throw new Error(`le port ${node.port} est déjà utilisé (un nœud d'une vérification précédente ?)`)
+  }
+
   const child = spawn(process.execPath, [file, '--port', node.port, '--size', size])
   const proc = { child, logs: [], exited: false }
   const log = data => proc.logs.push(...data.toString().trimEnd().split('\n'))
@@ -78,7 +84,7 @@ async function start(node) {
       await new Promise(resolve => setTimeout(resolve, 100))
     }
   }
-  throw new Error(`le nœud ${node.port} ne répond pas (port déjà utilisé ?)`)
+  throw new Error(`le nœud ${node.port} ne répond pas après ${timeout / 1000} s`)
 }
 
 async function stopAll() {
@@ -93,6 +99,9 @@ async function stopAll() {
 process.on('exit', () => {
   for (const proc of processes.values()) proc.child.kill()
 })
+// Ctrl+C ou arrêt par l'éditeur : on passe par 'exit' pour arrêter les nœuds
+process.on('SIGINT', () => process.exit(130))
+process.on('SIGTERM', () => process.exit(143))
 
 // Requête HTTP vers un nœud, renvoie { status, body }
 async function call(method, url, body) {

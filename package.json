@@ -11,10 +11,13 @@
   "author": "Damien Reimert",
   "license": "ISC",
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^5.2.1",
-    "got": "^13.0.0",
-    "serve": "^14.2.4",
-    "yargs": "^17.7.2"
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "got": "^16.0.0",
+    "serve": "^14.2.6",
+    "yargs": "^18.2.0"
+  },
+  "overrides": {
+    "compression": "^1.8.2"
   }
 }

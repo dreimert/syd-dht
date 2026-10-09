@@ -143,9 +143,18 @@ app.use(cors());
 // Pour parse les requêtes
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
+// Corps vide par défaut, pour que req.body.url ne plante pas sur une requête sans corps
+app.use((req, res, next) => {
+  req.body ??= {}
+  next()
+})
 // Comptage des sauts
 app.use((req, res, next) => {
   const count = Number(req.get('x-hops') ?? 0)
+
+  if (!Number.isInteger(count) || count < 0) {
+    return res.status(400).json(`En-tête x-hops invalide : ${req.get('x-hops')}`)
+  }
 
   if (count > maxHops) {
     console.error(`Requête abandonnée après ${count} sauts`)
@@ -209,8 +218,7 @@ app.post('/join', async (req, res) => {
   console.log('POST /join', req.body.url)
 
   // Cf. cli.js pour plus d'exemples
-  // const res = await got.post({
-  //   url: `${req.body.url}/add`,
+  // const response = await got.post(`${req.body.url}/add`, {
   //   headers: { 'Content-Type': 'application/json' },
   //   body: JSON.stringify({ url: config.url })
   // })
@@ -229,14 +237,20 @@ app.post('/add', (req, res) => {
 app.use((err, req, res, next) => {
   console.error(err.message)
 
+  // La réponse est déjà partie, Express se contente de couper la connexion
+  if (res.headersSent) {
+    return next(err)
+  }
+
   if (err.response) {
     return res
       .status(err.response.statusCode)
       .type(err.response.headers['content-type'] ?? 'json')
-      .send(err.response.rawBody)
+      .send(Buffer.from(err.response.rawBody))
   }
 
-  res.status(500).json(err.message)
+  // Erreurs d'Express lui-même, par exemple 400 pour un JSON mal formé
+  res.status(err.status ?? 500).json(err.message)
 })
 
 // Lancement du serveur

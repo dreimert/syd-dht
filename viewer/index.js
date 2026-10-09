@@ -51,13 +51,21 @@ function drawResponsibility (start, end, color = 'blue') {
   ctx.strokeStyle = defaultColor
 }
 
+// Renvoie la configuration du nœud, ou null s'il est injoignable
+async function fetchConfig (url) {
+  try {
+    const response = await fetch(`${url}/config`, { signal: AbortSignal.timeout(2000) })
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
 async function exploreDht (entryPoint) {
   /**
-   * @type { number }
+   * @type { { url: string, id?: number }[] }
    */
-  const size = await fetch(`${entryPoint}/config/size`).then(response => response.json())
-
-  const urls = [entryPoint]
+  const urls = [{ url: entryPoint }]
   const visited = new Set()
   /**
    * @type { {
@@ -68,9 +76,14 @@ async function exploreDht (entryPoint) {
    * }[] }
    **/
   const nodes = []
+  /**
+   * Nœuds cités comme voisins mais qui ne répondent pas
+   * @type { { url: string, id?: number }[] }
+   **/
+  const deadNodes = []
 
   while (urls.length > 0) {
-    const url = urls.pop()
+    const { url, id } = urls.pop()
 
     if (visited.has(url)) {
       continue
@@ -78,20 +91,25 @@ async function exploreDht (entryPoint) {
 
     visited.add(url)
 
-    const config = await fetch(`${url}/config`).then(response => response.json())
+    const config = await fetchConfig(url)
+
+    if (!config) {
+      deadNodes.push({ url, id })
+      continue
+    }
 
     nodes.push(config)
 
     if (config.successor.url) {
-      urls.push(config.successor.url)
+      urls.push(config.successor)
     }
 
     if (config.predecessor.url) {
-      urls.push(config.predecessor.url)
+      urls.push(config.predecessor)
     }
   }
 
-  return { size, nodes }
+  return { size: nodes[0]?.size, nodes, deadNodes }
 }
 
 async function show () {
@@ -103,6 +121,14 @@ async function show () {
   const entryPoint = document.getElementById('entryPoint').value
 
   const data = await exploreDht(entryPoint)
+
+  if (data.nodes.length === 0) {
+    const errorEl = document.createElement('pre')
+    errorEl.innerText = `${entryPoint} est injoignable`
+    configDisplay.appendChild(errorEl)
+    return
+  }
+
   const nbPoints = Math.pow(2, data.size)
   const angle = 2 * Math.PI / nbPoints
   let index = 0
@@ -128,6 +154,26 @@ async function show () {
     configDisplay.appendChild(configDisplayEl)
 
     index++
+  }
+
+  for (const node of data.deadNodes) {
+    if (typeof node.id === 'number') {
+      drawSmallCircle(
+        center.x + radius * Math.cos(node.id * angle),
+        center.y + radius * Math.sin(node.id * angle),
+        'grey'
+      )
+      ctx.fillText(
+        `${node.id} ✝`,
+        center.x + textRadius * Math.cos(node.id * angle),
+        center.y + textRadius * Math.sin(node.id * angle)
+      );
+    }
+
+    const configDisplayEl = document.createElement('pre')
+    configDisplayEl.innerText = `${node.url} : injoignable`
+    configDisplayEl.style.color = 'grey'
+    configDisplay.appendChild(configDisplayEl)
   }
 }
 

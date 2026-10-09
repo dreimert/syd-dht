@@ -41,7 +41,7 @@ Je pars du principe que vous savez coder en Javascript et utiliser git et github
   * http://www.fil.univ-lille1.fr/~routier/enseignement/licence/tw1/spoc/chap10-evenements-partie1.html (Vidéo / cours de Jean-Christophe Routier)
 * Git : http://rogerdudler.github.io/git-guide/index.fr.html
 
-Il vous faut aussi Node.js (version 18 minimum) et un éditeur de texte. Je vous conseille [Visual Studio Code](https://code.visualstudio.com/).
+Il vous faut aussi Node.js (version 22 minimum) et un éditeur de texte. Je vous conseille [Visual Studio Code](https://code.visualstudio.com/).
 
 ## Installation de node
 
@@ -233,7 +233,7 @@ Et c'est tout ;)
 Si je déroule l’exécution de la commande `join` : Le CLI contacte le nœud 4001 via la commande `join`.
 
 - Le nœud 4001 demande les clefs dont est responsable le nœud 4000 à l'aide de la commande `keys`.
-- Il calcule l'identifiant des clefs et garde celles dont il sera responsable, soit celles de l'intervalle ]4000, 4001] (Cf. protocole).
+- Il calcule l'identifiant des clefs et garde celles dont il sera responsable, soit celles de l'intervalle ]id de 4000, id de 4001] (Cf. protocole).
 - Pour chaque clef dont il sera responsable, il demande la valeur à 4000 et l'ajoute dans sa BDD.
 - Le nœud 4001 contacte le nœud 4000 via la commande `add`.
     - Le nœud 4000 met à jour son successeur et son prédécesseur avec nœud 4001 dans la commande `add`.
@@ -358,6 +358,10 @@ Recommencez en faisant rejoindre 4003 (id 60) via 4001 : il doit s'insérer entr
 ## L'anneau de la promo
 
 Votre DHT marche sur votre machine ? Faisons-en une seule pour toute la salle. L'enseignant lance un nœud d'amorçage et affiche le viewer au vidéoprojecteur : l'anneau grandit à chaque nouvel arrivant.
+
+Le nœud d'amorçage utilise les mêmes options que les autres, sinon il annonce `localhost` et l'anneau est cassé dès le premier `join` :
+
+    pm2 start index.js --name amorce -- --port 4000 --host <IP de l'enseignant> --size 16
 
 Pour que les autres machines puissent vous joindre, votre nœud doit annoncer votre IP plutôt que `localhost` :
 

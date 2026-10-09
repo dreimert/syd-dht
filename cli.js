@@ -26,6 +26,7 @@ const argv = yargs(hideBin(process.argv))
   })
   .option('bot', {
     alias: 'b',
+    type: 'boolean',
     default: false,
     description: 'désactive les messages utilisateur'
   })
@@ -74,8 +75,7 @@ switch (argv._[0]) {
   case 'put':
     info(`put ${argv.key} ${argv.value} =>`)
 
-    await handleResponse(got.put({
-      url: `${baseUrl}/db/${argv.key}`,
+    await handleResponse(got.put(`${baseUrl}/db/${argv.key}`, {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value: argv.value })
     }))
@@ -93,8 +93,7 @@ switch (argv._[0]) {
   case 'add':
     info(`add ${argv.nodeUrl} =>`)
 
-    await handleResponse(got.post({
-      url: `${baseUrl}/add`,
+    await handleResponse(got.post(`${baseUrl}/add`, {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: argv.nodeUrl })
     }))
@@ -102,8 +101,7 @@ switch (argv._[0]) {
   case 'join':
     info(`join ${argv.nodeUrl} =>`)
 
-    await handleResponse(got.post({
-      url: `${baseUrl}/join`,
+    await handleResponse(got.post(`${baseUrl}/join`, {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: argv.nodeUrl })
     }))
