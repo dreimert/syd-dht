@@ -5,13 +5,14 @@
   "description": "TD de DHT du cours de systèmes distribués du département à l'INSA Lyon.",
   "main": "index.js",
   "scripts": {
-    "viewer": "serve viewer"
+    "viewer": "serve viewer",
+    "check": "node check.js"
   },
   "author": "Damien Reimert",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.18.2",
+    "express": "^5.2.1",
     "got": "^13.0.0",
     "serve": "^14.2.4",
     "yargs": "^17.7.2"

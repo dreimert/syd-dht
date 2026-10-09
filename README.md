@@ -133,6 +133,22 @@ Si vous allez sur `http://localhost:4000/db/test`, vous devriez voir la valeur `
 
 **Durant ce TD, vous ne devez modifier que le fichier `index.js`**.
 
+Pour savoir où vous en êtes, lancez le vérificateur :
+
+    npm run check
+
+Il démarre ses propres nœuds sur les ports 5100 à 5103 (vos nœuds PM2 ne sont pas touchés) et valide le TD niveau par niveau. Au premier niveau qui échoue, il affiche ce qu'il attendait, ce qu'il a obtenu et les derniers logs des nœuds :
+
+    ✅ Niv. 1  Identifiant
+    ✅ Niv. 2  add
+    ❌ Niv. 3  join à deux nœuds
+       successeur de 5101 (id 58) : attendu {"id":17,"url":"http://localhost:5100"}, obtenu ...
+    🔒 Niv. 4  lookup
+    🔒 Niv. 5  get et put
+    🔒 Niv. 6  join à plusieurs nœuds
+
+Quand les six niveaux sont validés, vous pouvez rejoindre l'[anneau de la promo](#lanneau-de-la-promo).
+
 La première chose à faire est l'implémentation du calcul de l'identifiant du nœud. On veut deux propriétés principales pour cette fonction :
 
 * Elle doit être déterministe. C'est à dire que pour une URL donnée, elle doit toujours renvoyer la même valeur.
@@ -208,20 +224,20 @@ pour demander au nœud 4001 de rejoindre le réseau du nœud 4000. Malheureuseme
 
 Pour le moment, on va se limiter à deux nœuds. Ce que doit faire la commande `join` dans ce cas :
 
+- Copier les clefs dont le nœud est responsable (cf. protocole).
 - Appeler la commande `add` du nœud cible pour lui dire qu'il va rejoindre le réseau.
 - Et déclarer le nœud cible comme successeur et prédécesseur.
-- Copier les clefs dont le nœud est responsable (cf. protocole).
 
 Et c'est tout ;)
 
 Si je déroule l’exécution de la commande `join` : Le CLI contacte le nœud 4001 via la commande `join`.
 
+- Le nœud 4001 demande les clefs dont est responsable le nœud 4000 à l'aide de la commande `keys`.
+- Il calcule l'identifiant des clefs et garde celles dont il sera responsable, soit celles de l'intervalle ]4000, 4001] (Cf. protocole).
+- Pour chaque clef dont il sera responsable, il demande la valeur à 4000 et l'ajoute dans sa BDD.
 - Le nœud 4001 contacte le nœud 4000 via la commande `add`.
     - Le nœud 4000 met à jour son successeur et son prédécesseur avec nœud 4001 dans la commande `add`.
 - Le nœud 4001 met à jour son successeur et son prédécesseur avec le nœud 4000.
-- Le nœud 4001 demande les clefs dont est responsable le nœud 4000 à l'aide de la commande `keys`.
-- Il calcule l'identifiant des clefs et garde celles dont il est responsable (Cf. protocole).
-- Pour chaque clef dont il est responsable, il demande la valeur à 4000 et l'ajoute dans sa BDD.
 
 Commencez par implémenter la commande `add` qui doit :
 
@@ -275,12 +291,12 @@ Utilisez les logs pour savoir où passe les requêtes et sur quelles machines so
 
 Vous avez maintenant un réseau de deux nœuds. Il faut maintenant que vous puissiez ajouter plus de nœuds au réseau. Pour cela, il faut modifier la commande `join` pour qu'elle puisse ajouter un nœud au réseau quelle que soit sa taille. Ce que doit faire la commande dans ce cas :
 
-- Appeler la commande `lookup` du nœud cible pour récupérer le nœud responsable de la position du nœud appelant sur l'anneau. Astuce : l'identifiant du nœud étant le hash de son URL, il suffit de faire un `lookup` avec l'URL du nœud appelant comme clef.
+- Appeler la commande `lookup` du nœud cible pour récupérer le nœud responsable de la position du nœud appelant sur l'anneau. Astuce : l'identifiant du nœud étant le hash de son URL, il suffit de faire un `lookup` avec l'URL du nœud appelant comme clef. Une URL contient des `/` : encodez-la avec `encodeURIComponent` pour la mettre dans le chemin de la requête.
 - Récupérer le prédécesseur du nœud responsable.
+- Copier les clefs dont le nœud sera responsable.
 - Appeler la commande `add` du nœud responsable.
 - Appeler la commande `add` du prédécesseur.
 - Mettez à jour le successeur et le prédécesseur du nœud appelant.
-- Copier les clefs dont le nœud est responsable.
 
 Le diagramme suivant montre les échanges quand un nouveau nœud N rejoint le réseau en passant par un nœud C quelconque. S est le nœud responsable de la position de N (son futur successeur), et P le prédécesseur de S (le futur prédécesseur de N) :
 
@@ -297,19 +313,23 @@ sequenceDiagram
   C-->>N: url de S
   N->>S: GET /config/predecessor
   S-->>N: P
+  N->>S: GET /keys
+  loop Pour chaque clef dont l'id est dans ]P, N]
+    N->>S: GET /db/{clef}
+  end
   N->>S: POST /add {url: N}
   Note over S: predecessor = N
   N->>P: POST /add {url: N}
   Note over P: successor = N
   Note over N: successor = S, predecessor = P
-  N->>S: GET /keys
-  loop Pour chaque clef dont l'id est dans ]P, N]
-    N->>S: GET /db/{clef}
-  end
   N-->>CLI: OK
 ```
 
-L'ordre compte : il faut demander le prédécesseur de S **avant** d'appeler `add` sur S. Après cet appel, le prédécesseur de S est N lui-même.
+L'ordre compte :
+
+- il faut demander le prédécesseur de S **avant** d'appeler `add` sur S. Après cet appel, le prédécesseur de S est N lui-même ;
+- il faut copier les clefs **avant** d'appeler `add` sur S. Après cet appel, S n'est plus responsable de ces clefs et transmet les `GET /db` à N, qui ne les a pas encore : 404 ;
+- pendant la copie, les voisins de N ne sont pas encore à jour : `idIsInInterval(id)` utilise l'intervalle par défaut, qui est faux à ce moment. Passez l'intervalle ]P, N] explicitement.
 
 #### Implémentez la commande join à plusieurs nœuds
 #### Mettez à jour la commande add si besoin
@@ -334,6 +354,26 @@ Vous devez obtenir l'anneau 17 → 23 → 47 → 17 :
 - `node cli.js --port 4001 get Heidi` trouve toujours la valeur.
 
 Recommencez en faisant rejoindre 4003 (id 60) via 4001 : il doit s'insérer entre 47 et 17.
+
+## L'anneau de la promo
+
+Votre DHT marche sur votre machine ? Faisons-en une seule pour toute la salle. L'enseignant lance un nœud d'amorçage et affiche le viewer au vidéoprojecteur : l'anneau grandit à chaque nouvel arrivant.
+
+Pour que les autres machines puissent vous joindre, votre nœud doit annoncer votre IP plutôt que `localhost` :
+
+    pm2 start index.js --name promo -- --port 4000 --host <votre IP> --size 16
+
+Puis rejoignez l'anneau :
+
+    node cli.js --port 4000 join http://<IP de l'enseignant>:4000
+
+Tous les nœuds doivent utiliser le même `--size`. Avec `m = 6`, l'anneau n'a que 64 positions et deux nœuds d'une salle de 30 tombent presque sûrement au même endroit. Avec `m = 16`, le risque descend sous 1 %.
+
+**Ne lancez pas ce nœud avec `--watch`** : à chaque modification de votre code, il redémarrerait en ayant tout oublié et couperait l'anneau pour tout le monde.
+
+Si l'anneau est cassé, une requête peut tourner indéfiniment de nœud en nœud. Le code fourni l'arrête au bout de 64 sauts (option `--hops`) avec une erreur 508. Si vous la voyez, quelque chose ne va pas dans l'anneau : ouvrez le viewer.
+
+Observez ce qui se passe quand plusieurs personnes font `join` en même temps ou qu'un nœud s'arrête : ce sont les questions 2 et 3 ci-dessous, en vrai.
 
 ## Limites et questions de réflexion
 

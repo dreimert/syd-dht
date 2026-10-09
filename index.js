@@ -5,7 +5,8 @@ import cors from 'cors'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import crypto from 'crypto'
-import got from 'got' // Utile pour faire des requêtes HTTP
+import { AsyncLocalStorage } from 'async_hooks'
+import baseGot from 'got'
 
 // Gestion des options
 const argv = yargs(hideBin(process.argv))
@@ -23,6 +24,19 @@ const argv = yargs(hideBin(process.argv))
       default: 6,
     },
   })
+  .options({
+    host: {
+      description: "Adresse du nœud vue par les autres (votre IP pour un anneau entre plusieurs machines)",
+      alias: 'H',
+      default: 'localhost',
+    },
+  })
+  .options({
+    hops: {
+      description: "Nombre maximum de sauts d'une requête avant de l'abandonner",
+      default: 64,
+    },
+  })
   .parse()
 
 // Initialisation de la base de données
@@ -35,7 +49,11 @@ const db = {
 const size = argv.size
 // @ts-ignore
 const port = argv.port
-const url = `http://localhost:${port}`
+// @ts-ignore
+const host = argv.host
+// @ts-ignore
+const maxHops = argv.hops
+const url = `http://${host}:${port}`
 const id = 'Voir : Prenons un peu de <i>hash</i>'
 
 // Initialisation de la configuration du nœud
@@ -100,6 +118,24 @@ function idIsInInterval(id, start = config.predecessor.id, end = config.id) {
   }
 }
 
+// Protection contre les boucles, vous n'avez pas à y toucher.
+// Si l'anneau est cassé, une requête peut tourner indéfiniment de nœud en nœud.
+// Chaque requête transmise par `got` porte donc un compteur de sauts (en-tête x-hops)
+// et un nœud refuse une requête qui a fait plus de `--hops` sauts.
+const hops = new AsyncLocalStorage()
+
+const got = baseGot.extend({
+  timeout: { request: 10000 },
+  retry: { limit: 0 },
+  hooks: {
+    beforeRequest: [
+      options => {
+        options.headers['x-hops'] = String((hops.getStore() ?? 0) + 1)
+      },
+    ],
+  },
+})
+
 // Initialisation du serveur HTTP
 const app = express()
 // For viewer
@@ -107,6 +143,17 @@ app.use(cors());
 // Pour parse les requêtes
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
+// Comptage des sauts
+app.use((req, res, next) => {
+  const count = Number(req.get('x-hops') ?? 0)
+
+  if (count > maxHops) {
+    console.error(`Requête abandonnée après ${count} sauts`)
+    return res.status(508).json(`Requête abandonnée après ${count} sauts : l'anneau boucle-t-il ?`)
+  }
+
+  hops.run(count, next)
+})
 
 // Route pour la racine, pour tester le serveur par exemple. Vous pouvez mettre ce que vous voulez ici.
 app.get('/', (req, res) => {
@@ -175,6 +222,21 @@ app.post('/add', (req, res) => {
   console.log('POST /add', req.body.url)
 
   res.json('TODO')
+})
+
+// Gestion des erreurs, vous n'avez pas à y toucher.
+// Si une requête vers un autre nœud échoue, son code d'erreur (404, 508...) est renvoyé tel quel.
+app.use((err, req, res, next) => {
+  console.error(err.message)
+
+  if (err.response) {
+    return res
+      .status(err.response.statusCode)
+      .type(err.response.headers['content-type'] ?? 'json')
+      .send(err.response.rawBody)
+  }
+
+  res.status(500).json(err.message)
 })
 
 // Lancement du serveur
