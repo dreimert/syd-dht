@@ -118,6 +118,20 @@ function idIsInInterval(id, start = config.predecessor.id, end = config.id) {
   }
 }
 
+/**
+ * Construit l'URL d'une route d'un nœud pour une clef, par exemple keyUrl(config.successor.url, 'db', 'Bob')
+ * La clef est encodée : elle peut contenir des / (une URL par exemple) ou des espaces
+ *
+ * @param {string} nodeUrl l'URL du nœud à contacter
+ * @param {string} route la route, 'db' ou 'lookup'
+ * @param {string} key la clef
+ *
+ * @returns {string} l'URL de la requête
+ **/
+function keyUrl(nodeUrl, route, key) {
+  return `${nodeUrl}/${route}/${encodeURIComponent(key)}`
+}
+
 // Protection contre les boucles, vous n'avez pas à y toucher.
 // Si l'anneau est cassé, une requête peut tourner indéfiniment de nœud en nœud.
 // Chaque requête transmise par `got` porte donc un compteur de sauts (en-tête x-hops)
@@ -198,7 +212,7 @@ app.get('/keys', (req, res) => {
 app.get('/lookup/:key', async (req, res) => {
   console.log('GET /lookup', req.params.key)
 
-  // getIdFromString et idIsInInterval peuvent vous être utiles ;)
+  // getIdFromString, idIsInInterval et keyUrl peuvent vous être utiles ;)
   res.json('TODO')
 })
 
@@ -217,11 +231,11 @@ app.get('/config', (req, res) => {
 app.post('/join', async (req, res) => {
   console.log('POST /join', req.body.url)
 
-  // Cf. cli.js pour plus d'exemples
+  // Cf. cli.js pour plus d'exemples. .json() renvoie la réponse décodée.
   // const response = await got.post(`${req.body.url}/add`, {
   //   headers: { 'Content-Type': 'application/json' },
   //   body: JSON.stringify({ url: config.url })
-  // })
+  // }).json()
 
   res.json('TODO')
 })

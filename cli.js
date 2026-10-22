@@ -14,6 +14,8 @@ const argv = yargs(hideBin(process.argv))
   .command('add <nodeUrl>', "Déclare la présence d'un nouveau nœud")
   .command('config <key>', 'Permet de récupérer la valeur key de la configuration du nœud')
   .command('version', 'Demande la version du CLI')
+  // Sinon yargs convertit les clefs qui ressemblent à des nombres : 0x10 deviendrait 16
+  .string(['key', 'value'])
   .option('url', {
     alias: 'u',
     default: 'http://localhost',
@@ -49,10 +51,14 @@ function info (msg) {
 
 // Construction de l'url de base du nœud à contacter
 const baseUrl = `${argv.url}:${argv.port}`
+// La clef est encodée pour pouvoir contenir des / (une URL par exemple)
+const key = encodeURIComponent(argv.key)
 
 // Fonction utilitaire pour gérer les réponses des requêtes
 async function handleResponse (request) {
   try {
+    // body est le texte brut de la réponse, ici affiché tel quel.
+    // Dans index.js, utilisez plutôt .json() pour obtenir la valeur décodée.
     const { body } = await request
     info(body)
   } catch (error) {
@@ -70,12 +76,12 @@ switch (argv._[0]) {
   case 'get':
     info(`Commande get ${argv.key} =>`)
 
-    await handleResponse(got(`${baseUrl}/db/${argv.key}`))
+    await handleResponse(got(`${baseUrl}/db/${key}`))
     break
   case 'put':
     info(`put ${argv.key} ${argv.value} =>`)
 
-    await handleResponse(got.put(`${baseUrl}/db/${argv.key}`, {
+    await handleResponse(got.put(`${baseUrl}/db/${key}`, {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value: argv.value })
     }))
@@ -88,7 +94,7 @@ switch (argv._[0]) {
   case 'lookup':
     info(`lookup ${argv.key} =>`)
 
-    await handleResponse(got(`${baseUrl}/lookup/${argv.key}`))
+    await handleResponse(got(`${baseUrl}/lookup/${key}`))
     break
   case 'add':
     info(`add ${argv.nodeUrl} =>`)
@@ -109,7 +115,7 @@ switch (argv._[0]) {
   case 'config':
     info(`config ${argv.key} =>`)
 
-    await handleResponse(got(`${baseUrl}/config/${argv.key}`))
+    await handleResponse(got(`${baseUrl}/config/${key}`))
 
     break
   default:

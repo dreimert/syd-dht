@@ -37,8 +37,9 @@ function responsible(ring, id) {
   return sorted.find(node => node.id >= id) ?? sorted[0]
 }
 
-// Des clefs de test, avec au moins une clef par intervalle de l'anneau à quatre nœuds
-const keys = ['Bob', 'Alice', 'Heidi', 'Carol', 'Dave', 'Eve']
+// Des clefs de test, avec au moins une clef par intervalle de l'anneau à quatre nœuds.
+// La clef qui contient / et une espace vérifie que les clefs sont encodées quand elles sont propagées.
+const keys = ['Bob', 'Alice', 'Heidi', 'Carol', 'Dave', 'Eve', 'http://exemple.fr/une clef']
 for (const node of nodes) {
   for (let i = 0; !keys.some(key => responsible(nodes, getIdFromString(key)) === node); i++) {
     if (responsible(nodes, getIdFromString(`clef${i}`)) === node) {
@@ -167,7 +168,7 @@ async function checkKeys(ring, stored) {
   }
   for (const node of ring) {
     for (const key of stored) {
-      expect(await json('GET', `${node.url}/db/${key}`), `valeur de ${key}`, `get ${key} depuis ${node.port}`)
+      expect(await json('GET', `${node.url}/db/${encodeURIComponent(key)}`), `valeur de ${key}`, `get ${key} depuis ${node.port}`)
     }
   }
 }
@@ -213,7 +214,7 @@ const levels = [
       for (const node of [A, B]) {
         for (const key of keys) {
           const owner = responsible([A, B], getIdFromString(key))
-          expect(await json('GET', `${node.url}/lookup/${key}`), owner.url, `lookup ${key} (id ${getIdFromString(key)}) depuis ${node.port}`)
+          expect(await json('GET', `${node.url}/lookup/${encodeURIComponent(key)}`), owner.url, `lookup ${key} (id ${getIdFromString(key)}) depuis ${node.port}`)
         }
       }
     },
@@ -223,7 +224,7 @@ const levels = [
     async run() {
       await twoNodeRing()
       for (const [i, key] of keys.entries()) {
-        await json('PUT', `${[A, B][i % 2].url}/db/${key}`, { value: `valeur de ${key}` })
+        await json('PUT', `${[A, B][i % 2].url}/db/${encodeURIComponent(key)}`, { value: `valeur de ${key}` })
       }
       await checkKeys([A, B], keys)
       for (const node of [A, B]) {
@@ -237,7 +238,7 @@ const levels = [
     async run() {
       await twoNodeRing()
       for (const key of keys) {
-        await json('PUT', `${A.url}/db/${key}`, { value: `valeur de ${key}` })
+        await json('PUT', `${A.url}/db/${encodeURIComponent(key)}`, { value: `valeur de ${key}` })
       }
       await start(C)
       await json('POST', `${C.url}/join`, { url: A.url })

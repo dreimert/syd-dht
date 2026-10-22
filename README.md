@@ -14,7 +14,7 @@ Je cite Wikipedia sur les avantages de Chord :
 * Disponibilité : On peut toujours trouver le nœud responsable d'une clef, même lorsque le système est instable.
 * Aucune contrainte sur le nom des clefs.
 
-Hum. Oups. Ça c'est le sujet que j'avais imaginé avant de me rendre compte que c'était trop compliqué pour un TD. On va implémenter une version un peu bancale d'une DHT mais dont l'objectif est de vous faire comprendre les grandes lignes. Pour simplifier, je vais rogner sur la propriété de passage à l'échelle. L'implémentation cible est une DHT qui permet de stocker des données sur un réseau pair à pair sans leader et où tous les nœuds sont égaux. Elle permet de retrouver une donnée en O(n) mais au prix d'un passage à l'échelle difficile et d'une très grande vulnérabilité aux attaques.
+Hum. Oups. Ça c'est le sujet que j'avais imaginé avant de me rendre compte que c'était trop compliqué pour un TD. On va implémenter une version un peu bancale d'une DHT mais dont l'objectif est de vous faire comprendre les grandes lignes. Pour simplifier, je vais rogner sur la propriété de passage à l'échelle. L'implémentation cible est une DHT qui permet de stocker des données sur un réseau pair à pair sans leader et où tous les nœuds sont égaux. La recherche d'une donnée y coûte O(n) messages au lieu de O(log n), et le réseau ne supporte ni le départ ni la panne d'un nœud.
 
 Concrètement, voici ce que l'on garde de Chord et ce que l'on laisse de côté :
 
@@ -29,16 +29,27 @@ Concrètement, voici ce que l'on garde de Chord et ce que l'on laisse de côté 
 
 Les deux premières lignes sont le cœur d'une DHT et vous les implémenterez entièrement. Les autres sont discutées dans [Limites et questions de réflexion](#limites-et-questions-de-réflexion).
 
+## Objectifs
+
+À la fin de ce TD, vous saurez :
+
+* expliquer comment le hachage cohérent place les nœuds et les clefs sur un anneau et répartit la responsabilité des clefs ;
+* acheminer une requête de proche en proche jusqu'au nœud responsable d'une clef ;
+* faire entrer un nœud dans l'anneau sans perdre de données, et expliquer pourquoi l'ordre des messages compte ;
+* identifier les limites de cette implémentation et les mécanismes de Chord qui les corrigent.
+
+Le minimum attendu est de valider les six niveaux du vérificateur. La section [Pour aller plus loin](#pour-aller-plus-loin) est un bonus.
+
 ## Prérequis
 
 Je pars du principe que vous savez coder en Javascript et utiliser git et github. Si ce n'est pas le cas, je vous invite pour le prochain TD à lire :
 
 * Javascript :
-  * https://eloquentjavascript.net/ (troisième édition en anglais)
+  * https://eloquentjavascript.net/ (quatrième édition en anglais)
   * https://fr.eloquentjavascript.net/ (première edition en français, anglais, allemand et polonais)
 * Programmation évènementielle en Javascript:
-  * https://eloquentjavascript.net/11_async.html (Chapitre 11 de Eloquent JavaScript troisième édition)
-  * http://www.fil.univ-lille1.fr/~routier/enseignement/licence/tw1/spoc/chap10-evenements-partie1.html (Vidéo / cours de Jean-Christophe Routier)
+  * https://eloquentjavascript.net/11_async.html (Chapitre 11 de Eloquent JavaScript quatrième édition)
+  * https://www.fil.univ-lille.fr/~routier/enseignement/licence/tw1/spoc/chap10-evenements-partie1.html (Vidéo / cours de Jean-Christophe Routier)
 * Git : http://rogerdudler.github.io/git-guide/index.fr.html
 
 Il vous faut aussi Node.js (version 22 minimum) et un éditeur de texte. Je vous conseille [Visual Studio Code](https://code.visualstudio.com/).
@@ -113,7 +124,7 @@ Dans notre DHT, les nœuds doivent supporter les opérations HTTP suivantes :
 
 ## Code initial
 
-Vous pouvez voir dans `index.js` qu'il y a déjà du code. Ce code est une base de donnée minimaliste et permet de lancer un serveur HTTP sur le port passé en paramètre. Pour lancer le code, il faut faire :
+Vous pouvez voir dans `index.js` qu'il y a déjà du code. Ce code est une base de données minimaliste et permet de lancer un serveur HTTP sur le port passé en paramètre. Pour lancer le code, il faut faire :
 
     node index.js --port 4000
 
@@ -147,7 +158,7 @@ Il démarre ses propres nœuds sur les ports 5100 à 5103 (vos nœuds PM2 ne son
     🔒 Niv. 5  get et put
     🔒 Niv. 6  join à plusieurs nœuds
 
-Quand les six niveaux sont validés, vous pouvez rejoindre l'[anneau de la promo](#lanneau-de-la-promo).
+Chaque étape du sujet indique le niveau qu'elle valide. Quand les six niveaux sont validés, vous pouvez rejoindre l'[anneau de la promo](#lanneau-de-la-promo).
 
 La première chose à faire est l'implémentation du calcul de l'identifiant du nœud. On veut deux propriétés principales pour cette fonction :
 
@@ -158,14 +169,11 @@ Pour ce faire, on va utiliser une fonction de hachage et plus spécifiquement SH
 
 ### Prenons un peu de *hash*
 
-Une fonction de hachage est une fonction qui prend en entrée un ensemble de données et retourne une empreinte, aussi appelée *hash*. L'empreinte respecte deux principes : il est extrêmement difficile de trouver deux entrées qui donnent la même empreinte, et une empreinte donnée ne permet pas de remonter à l'entrée initiale. On parle de résistance aux collisions et de non calculabilité de la pré-image. Cette empreinte est de taille fixe quelque-soit l'entrée. Une fonction couramment utilisée est SHA. Voici quelques exemples d'empreinte :
+Une fonction de hachage est une fonction qui prend en entrée un ensemble de données et retourne une empreinte, aussi appelée *hash*. L'empreinte respecte deux principes : il est extrêmement difficile de trouver deux entrées qui donnent la même empreinte, et une empreinte donnée ne permet pas de remonter à l'entrée initiale. On parle de résistance aux collisions et de non calculabilité de la pré-image. Cette empreinte est de taille fixe quelle que soit l'entrée. Une fonction couramment utilisée est SHA. Voici quelques exemples d'empreinte :
 
 ```Bash
-> echo -n "Blockchain" | shasum
-# efe3fbaa6db3f43cf45d8ee3fdb168cd448afa41  -
-
-> echo -n "Block" | shasum
-# 82dd2cdf36f9436d89f404454654ad3e53fd428d  -
+> echo -n "Chord" | shasum
+# a40c897a2eabd70d4a4cb5b0be47bc9fc4ca7776  -
 
 > echo -n "Vous commencez à voir le principe ?" | shasum
 # 208d80b019417253e2139692bdcc408ad8030ff2  -
@@ -174,14 +182,16 @@ Une fonction de hachage est une fonction qui prend en entrée un ensemble de don
 Une propriété intéressante est qu'une petite modification dans l'entrée change totalement l'empreinte :
 
 ```Bash
-> echo -n "Blockchain" | shasum
-# efe3fbaa6db3f43cf45d8ee3fdb168cd448afa41  -
+> echo -n "Chord" | shasum
+# a40c897a2eabd70d4a4cb5b0be47bc9fc4ca7776  -
 
-> echo -n "blockchain" | shasum
-# 56fde8f4392113e0f19e0430f14502e06968669f  -
+> echo -n "chord" | shasum
+# 4b3a0b93da3555e403bf0e8bf071705a6a6fd905  -
 ```
 
 L'option `-n` empêche `echo` d'ajouter un retour à la ligne, qui changerait l'empreinte. Vous obtenez ainsi la même empreinte qu'avec la fonction `getHash` ci-dessous.
+
+SHA-1, la version utilisée par Chord et par ce TD, n'est plus considérée comme résistante aux collisions : des chercheurs ont produit deux PDF différents de même empreinte en 2017 ([SHAttered](https://shattered.io/)). On lui préfère aujourd'hui SHA-256 pour la sécurité. Ici, ce n'est pas gênant : on ne garde de toute façon que quelques bits de l'empreinte (voir plus bas).
 
 Les fonctions de hachage sont couramment utilisées pour vérifier que des données n'ont pas été corrompues lors d'un téléchargement par exemple. Le code suivant permet de produire une empreinte en Javascript.
 
@@ -196,11 +206,11 @@ const getHash = function getHash(data) {
 
 Mais ici, c'est un entier sur l'anneau que je veux. Il suffit de récupérer les `m` derniers bits de l’empreinte et de les convertir en un entier où `m` est l'exposant de la taille de l'anneau. Je vous ai mis la fonction `getIdFromString` dans le code du serveur qui fait exactement ça.
 
-**Attention :** en ne gardant que `m` bits, on perd la résistance aux collisions. Avec `m = 6`, l'anneau ne compte que 64 positions et deux nœuds peuvent obtenir le même identifiant. C'est le cas de `http://localhost:4002` et `http://localhost:4006` (id 23). Évitez ces combinaisons de ports, ou augmentez `m` avec l'option `--size`. Question : que devrait faire votre implémentation si un nœud qui rejoint le réseau a le même identifiant qu'un nœud existant ?
+**Attention :** en ne gardant que `m` bits, on perd la résistance aux collisions. Avec `m = 6`, l'anneau ne compte que 64 positions et deux nœuds peuvent obtenir le même identifiant. C'est le cas de `http://localhost:4002` et `http://localhost:4006` (id 23). Évitez ces combinaisons de ports, ou augmentez `m` avec l'option `--size`. Que devrait faire votre implémentation dans ce cas ? C'est la [question 7](#limites-et-questions-de-réflexion).
 
-#### Mettez à jour le code du serveur pour que l'identifiant du nœud soit calculé à partir de l'URL et initialise correctement la configuration
+#### Mettez à jour le code du serveur pour que l'identifiant du nœud soit calculé à partir de l'URL (Niv. 1)
 
-Vous pouvez vérifier via `http://localhost:4000/config/id`. En cas de problème, `pm2 log` pour voir les logs ;).
+Un nœud seul est son propre successeur et prédécesseur : vérifiez que `successor` et `predecessor` portent bien ce nouvel identifiant. Vous pouvez vérifier via `http://localhost:4000/config/id`. En cas de problème, `pm2 log` pour voir les logs ;).
 
 ### Viewer
 
@@ -226,59 +236,56 @@ pour demander au nœud 4001 de rejoindre le réseau du nœud 4000. Malheureuseme
 
 Pour le moment, on va se limiter à deux nœuds. Ce que doit faire la commande `join` dans ce cas :
 
-- Copier les clefs dont le nœud est responsable (cf. protocole).
 - Appeler la commande `add` du nœud cible pour lui dire qu'il va rejoindre le réseau.
 - Et déclarer le nœud cible comme successeur et prédécesseur.
 
-Et c'est tout ;)
+Et c'est tout ;) On ignore les clefs de la base de données pour le moment : leur copie viendra avec le [`join` à plusieurs nœuds](#plus-on-est-de-fous-plus-on-rit).
 
 Si je déroule l’exécution de la commande `join` : Le CLI contacte le nœud 4001 via la commande `join`.
 
-- Le nœud 4001 demande les clefs dont est responsable le nœud 4000 à l'aide de la commande `keys`.
-- Il calcule l'identifiant des clefs et garde celles dont il sera responsable, soit celles de l'intervalle ]id de 4000, id de 4001] (Cf. protocole).
-- Pour chaque clef dont il sera responsable, il demande la valeur à 4000 et l'ajoute dans sa BDD.
 - Le nœud 4001 contacte le nœud 4000 via la commande `add`.
     - Le nœud 4000 met à jour son successeur et son prédécesseur avec nœud 4001 dans la commande `add`.
 - Le nœud 4001 met à jour son successeur et son prédécesseur avec le nœud 4000.
 
-Commencez par implémenter la commande `add` qui doit :
+Commencez par implémenter la commande `add`. Elle applique la règle du [protocole](#protocole) : si le nouveau nœud X est entre N et son successeur, il devient le successeur de N ; s'il est entre le prédécesseur de N et N, il devient le prédécesseur de N.
 
-Vérifier si le nœud qui veut rejoindre le réseau est plus proche que le successeur ou le prédécesseur. Si c'est le cas, il doit le remplacer. Mais vu qu'il n'y a pas de successeur ou de prédécesseur, il suffit de mettre le nœud qui veut rejoindre le réseau comme successeur et comme prédécesseur.
+Pour un nœud seul, successeur et prédécesseur sont le nœud lui-même. L'intervalle ]N, N] fait alors tout le tour de l'anneau : `idIsInInterval(x, N, N)` est toujours vrai, et X devient à la fois successeur et prédécesseur. Vous pouvez commencer par ce seul cas, mais la règle complète le traite déjà, sans cas particulier.
 
-#### Implémentez la commande `add` à deux nœuds
+#### Implémentez la commande `add` à deux nœuds (Niv. 2)
 
 Via le CLI, vous pouvez simuler l'appel à la commande `add`.
 
 Vous pouvez vérifier via le CLI ou votre navigateur que le successeur et le prédécesseur du nœud 4000 sont bien le nœud 4001 et inversement.
 
-#### Implémentez la commande `join` à deux nœuds
+#### Implémentez la commande `join` à deux nœuds (Niv. 3)
 
 Vous pouvez vérifier via le CLI ou votre navigateur que le successeur et le prédécesseur du nœud 4001 sont bien le nœud 4000. Et via les logs que le nœud 4000 a bien reçu la commande `add` et s'est mis à jour.
 
-On ignore les clefs dans la base de donnée pour le moment.
-
 ### Trouver le ~~coupable~~ responsable
 
-Vous avez deux nœuds sur l'anneau. Normalement, si vous avez utilisé les port 4000 et 4001 et que vous hachez l'url, ils ont respectivement les ids 47 et 17. Le nœud 4000 a pour id 47 et est responsable des clefs entre son prédécesseur et lui soit des clefs entre 18 et 47 et le nœud 4001 est responsable des clefs entre 48 et 17. Pour le moment, les nœuds ne savent pas qui est responsable de quelle clef. Il faut donc implémenter la commande `lookup` qui permet de trouver le nœud responsable d'une clef.
+Vous avez deux nœuds sur l'anneau. Normalement, si vous avez utilisé les ports 4000 et 4001 et que vous hachez l'url, ils ont respectivement les ids 47 et 17. Le nœud 4000 a pour id 47 et est responsable des clefs entre son prédécesseur et lui soit des clefs entre 18 et 47 et le nœud 4001 est responsable des clefs entre 48 et 17. Pour le moment, les nœuds ne savent pas qui est responsable de quelle clef. Il faut donc implémenter la commande `lookup` qui permet de trouver le nœud responsable d'une clef.
 
 Pour vous aider :
 
 - GET lookup \<key\> : Renvoie le nœud responsable de la clef key. Si le nœud est responsable de la clef, renvoie son url sinon propage la demande au nœud suivant et renvoie la réponse.
 - Le nœud reçoit la clef sous forme de chaîne de caractères : utilisez `getIdFromString` pour calculer son identifiant sur l'anneau.
-- Vous pouvez observer le code du CLI pour voir comment il fait des requêtes HTTP.
+- Pour interroger un autre nœud, utilisez `got`, déjà importé dans `index.js`. Le code du CLI montre comment construire les requêtes. Pour lire la réponse, ajoutez `.json()` : `const url = await got(keyUrl(config.successor.url, 'lookup', req.params.key)).json()`. Le `body` que lit le CLI est le texte JSON brut : renvoyé avec `res.json`, il serait encodé deux fois.
+- Construisez les URL des routes `db` et `lookup` avec la fonction `keyUrl` fournie, y compris quand vous propagez une requête. Elle encode la clef : Express décode `req.params.key`, et une clef qui contient un `/`, comme une URL, casserait le chemin et donnerait un 404. Seules les clefs `.` et `..` restent inutilisables : elles sont interprétées comme « dossier courant » et « dossier parent » dans l'URL.
 
-#### Implémentez la commande lookup
+#### Implémentez la commande lookup (Niv. 4)
 
 Pour tester :
 
-    node cli.js lookup Bob # => 4000
-    node cli.js lookup Alice # => 4001
+    node cli.js lookup Bob # => "http://localhost:4000"
+    node cli.js lookup Alice # => "http://localhost:4001"
+
+Le CLI affiche la réponse JSON telle quelle, d'où les guillemets.
 
 ### Stocker des données au bon endroit
 
 Maintenant que vous savez qui est responsable de quelle clef, il faut stocker les données au bon endroit. Pour cela, il faut modifier les implémentations des commandes `get` et `put`.
 
-#### Implémentez les commandes get et put
+#### Implémentez les commandes get et put (Niv. 5)
 
 Pour tester :
 
@@ -287,13 +294,13 @@ Pour tester :
 
     node cli.js get Alice
 
-Utilisez les logs pour savoir où passe les requêtes et sur quelles machines sont stockées les données.
+Utilisez les logs pour savoir où passent les requêtes et sur quelles machines sont stockées les données.
 
 ### Plus on est de fous, plus on rit
 
 Vous avez maintenant un réseau de deux nœuds. Il faut maintenant que vous puissiez ajouter plus de nœuds au réseau. Pour cela, il faut modifier la commande `join` pour qu'elle puisse ajouter un nœud au réseau quelle que soit sa taille. Ce que doit faire la commande dans ce cas :
 
-- Appeler la commande `lookup` du nœud cible pour récupérer le nœud responsable de la position du nœud appelant sur l'anneau. Astuce : l'identifiant du nœud étant le hash de son URL, il suffit de faire un `lookup` avec l'URL du nœud appelant comme clef. Une URL contient des `/` : encodez-la avec `encodeURIComponent` pour la mettre dans le chemin de la requête.
+- Appeler la commande `lookup` du nœud cible pour récupérer le nœud responsable de la position du nœud appelant sur l'anneau. Astuce : l'identifiant du nœud étant le hash de son URL, il suffit de faire un `lookup` avec l'URL du nœud appelant comme clef. Comme pour toute clef, construisez l'URL avec `keyUrl`.
 - Récupérer le prédécesseur du nœud responsable.
 - Copier les clefs dont le nœud sera responsable.
 - Appeler la commande `add` du nœud responsable.
@@ -310,14 +317,14 @@ sequenceDiagram
   participant S as Responsable S
   participant P as Prédécesseur P
   CLI->>N: POST /join {url: C}
-  N->>C: GET /lookup/{url de N}
+  N->>C: GET /lookup/{url de N encodée}
   Note over C: propage de successeur en successeur jusqu'à S
   C-->>N: url de S
   N->>S: GET /config/predecessor
   S-->>N: P
   N->>S: GET /keys
   loop Pour chaque clef dont l'id est dans ]P, N]
-    N->>S: GET /db/{clef}
+    N->>S: GET /db/{clef encodée}
   end
   N->>S: POST /add {url: N}
   Note over S: predecessor = N
@@ -330,11 +337,11 @@ sequenceDiagram
 L'ordre compte :
 
 - il faut demander le prédécesseur de S **avant** d'appeler `add` sur S. Après cet appel, le prédécesseur de S est N lui-même ;
-- il faut copier les clefs **avant** d'appeler `add` sur S. Après cet appel, S n'est plus responsable de ces clefs et transmet les `GET /db` à N, qui ne les a pas encore : 404 ;
+- il faut copier les clefs **avant** d'appeler `add` sur S. Après cet appel, S n'est plus responsable de ces clefs : il transmet les `GET /db` à son successeur, et la requête fait le tour de l'anneau jusqu'à N, qui ne les a pas encore : 404. Si P n'est pas encore à jour non plus, la requête tourne en boucle jusqu'à l'erreur 508 ;
 - pendant la copie, les voisins de N ne sont pas encore à jour : `idIsInInterval(id)` utilise l'intervalle par défaut, qui est faux à ce moment. Passez l'intervalle ]P, N] explicitement.
 
-#### Implémentez la commande join à plusieurs nœuds
-#### Mettez à jour la commande add si besoin
+#### Implémentez la commande join à plusieurs nœuds (Niv. 6)
+#### Mettez à jour la commande add si besoin (Niv. 6)
 
 Votre `add` doit appliquer la règle complète décrite dans le [protocole](#protocole). Pour savoir si X est entre N et son successeur, `idIsInInterval(x, config.id, config.successor.id)` fait l'affaire.
 
@@ -390,7 +397,9 @@ Votre DHT fonctionne tant que personne ne part et que les nœuds arrivent un par
 3. **Arrivées simultanées.** Deux nœuds dont les identifiants tombent dans le même intervalle font `join` en même temps. Déroulez les échanges du diagramme pour les deux : dans quel état est l'anneau à la fin ? Comment la stabilisation périodique de Chord règle-t-elle ce problème ?
 4. **Coût.** Combien de requêtes HTTP coûte un `get` dans le pire cas avec n nœuds ? Dans Chord, la i-ème entrée de la *finger table* du nœud n pointe vers le responsable de n + 2<sup>i-1</sup>. Pourquoi cela ramène-t-il le coût à O(log n) ?
 5. **Intervalle.** Pourquoi la responsabilité est-elle un intervalle ouvert d'un côté et fermé de l'autre ? Que se passerait-il avec [prédécesseur, nœud] ?
-6. **Attaque.** Si chaque nœud pouvait choisir son identifiant, comment un attaquant pourrait-il empêcher l'accès à une clef précise ? Pourquoi hacher l'IP limite-t-il cette attaque, et pourquoi ne la supprime-t-il pas ?
+6. **Attaque.** Si chaque nœud pouvait choisir son identifiant, comment un attaquant pourrait-il empêcher l'accès à une clef précise ? Pourquoi hacher l'IP limite-t-il cette attaque, et pourquoi ne la supprime-t-il pas ? Dans ce TD, on hache aussi le port : un attaquant peut-il choisir sa place sur l'anneau ? (Indice : regardez comment `check.js` choisit ses ports.)
+7. **Collision.** Que devrait faire votre implémentation si un nœud qui rejoint le réseau a le même identifiant qu'un nœud existant ? Que se passe-t-il aujourd'hui ?
+8. **Fenêtre d'incohérence.** Entre le `add` sur S et le `add` sur P, l'anneau n'est pas cohérent. Que devient un `get` d'une clef de ]P, N] reçu à ce moment ? Et un `get` d'une autre clef ?
 
 ## Évaluation
 
