@@ -88,6 +88,11 @@ Vous allez faire tourner plusieurs nœuds en même temps. PM2, un gestionnaire d
 
 Le `--` sépare les options de PM2 de celles de votre programme. Avec `--watch`, PM2 redémarre le nœud à chaque modification du code. **Attention : un nœud redémarré a tout oublié** (voisins et base de données). Après une modification, relancez les commandes `join` pour reconstruire l'anneau. Plus de détails dans l'[annexe PM2](#annexe--pm2).
 
+**Sous Windows avec PowerShell**, le `--` est supprimé avant d'arriver à PM2 : PM2 répond `error: unknown option '--port'`, et `-p` ne fonctionne qu'en apparence (PM2 le prend pour son option `--pid` et le nœud écoute sur le port par défaut, 4000). Mettez le `--` entre guillemets, ou appelez `pm2.cmd` à la place de `pm2` :
+
+    pm2 start index.js --name n4001 --watch '--' --port 4001
+    pm2.cmd start index.js --name n4001 --watch -- --port 4001
+
 ## Description technique
 
 Une DHT est un réseau pair à pair qui permet d'associer une clef à un nœud. Pour cela, elle utilise une fonction de hachage qui permet de transformer une clef en une valeur numérique. Dans Chord, les nœuds sont disposés sur un **anneau** de taille 2<sup>m</sup>, `m` étant un paramètre du réseau. Ce `m` est fixe pour un réseau donné. **Un nœud est responsable des clefs dont la conversion en valeur numérique est incluse entre son prédécesseur (exclu) et lui (inclus) sur l'anneau**, soit l'intervalle ]prédécesseur, nœud]. Cette valeur numérique est ensuite utilisée pour trouver le nœud qui est responsable de cette clef. Pour cela, chaque nœud connait ses voisins. Lorsqu'un nœud reçoit une requête pour une clef, il regarde si c'est lui qui est responsable de la clef. Si c'est le cas, il renvoie la valeur associée à la clef, ou une erreur 404 si la clef n'existe pas. Sinon, il transmet la requête à son successeur sur l'anneau.
