@@ -1,0 +1,1073 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chord au tableau</title>
+  <style>
+    :root {
+      --bg: #fff;
+      --fg: #1a1a1a;
+      --muted: #666;
+      --line: #ddd;
+      --panel: #f5f5f2;
+      --ring: #c8c8c8;
+      --accent: #d9480f;
+      --accent2: #1971c2;
+      --ok: #2b8a3e;
+      --err: #c92a2a;
+      --gold: #f59f00;
+      --finger: #7048e8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font: 17px/1.4 system-ui, sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 420px;
+      height: 100vh;
+    }
+
+    .stage {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 8px 16px;
+    }
+
+    #ring {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      user-select: none;
+    }
+
+    .stepper {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 96px;
+      padding: 8px 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .stepper button {
+      font-size: 22px;
+      padding: 6px 14px;
+    }
+
+    #stepText {
+      flex: 1;
+      font-size: 22px;
+      line-height: 1.35;
+    }
+
+    #stepCount {
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    aside {
+      overflow-y: auto;
+      padding: 12px 16px 32px;
+      background: var(--panel);
+      border-left: 1px solid var(--line);
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 22px;
+    }
+
+    h2 {
+      margin: 18px 0 6px;
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin: 6px 0;
+    }
+
+    input[type=text], select {
+      font: inherit;
+      padding: 4px 6px;
+    }
+
+    input[type=text] {
+      width: 150px;
+    }
+
+    button {
+      font: inherit;
+      padding: 4px 12px;
+      cursor: pointer;
+    }
+
+    label {
+      display: block;
+      margin: 4px 0;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .ok {
+      color: var(--ok);
+    }
+
+    .err {
+      color: var(--err);
+    }
+
+    #hash {
+      margin: 6px 0;
+      padding: 6px 8px;
+      overflow-x: auto;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      font: 14px/1.5 ui-monospace, monospace;
+      white-space: pre;
+    }
+
+    #hash b {
+      color: var(--accent);
+    }
+
+    #steps {
+      position: relative;
+      max-height: 40vh;
+      overflow-y: auto;
+      margin: 0;
+      padding-left: 28px;
+      font-size: 14px;
+    }
+
+    #steps li {
+      padding: 2px 4px;
+      cursor: pointer;
+    }
+
+    #steps li.current {
+      background: #ffe8cc;
+    }
+
+    #steps li.future {
+      color: #aaa;
+    }
+
+    #nodeInfo table {
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    #nodeInfo td, #nodeInfo th {
+      padding: 1px 8px 1px 0;
+      text-align: left;
+    }
+
+    svg text {
+      font-family: system-ui, sans-serif;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      #ring {
+        height: 92vw;
+        flex: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div class="stage">
+      <svg id="ring" viewBox="-465 -465 930 930"></svg>
+      <div class="stepper">
+        <button type="button" id="prev" title="Étape précédente (←)">◀</button>
+        <div id="stepText"></div>
+        <span id="stepCount"></span>
+        <button type="button" id="next" title="Étape suivante (→ ou espace)">▶</button>
+        <button type="button" id="finish" title="Aller à la fin (Fin)">⏭</button>
+      </div>
+    </div>
+    <aside>
+      <h1>Chord au tableau</h1>
+      <div id="health"></div>
+
+      <h2>Anneau</h2>
+      <div class="row">
+        <label>m = <select id="m">
+          <option value="6">6 (64 positions)</option>
+          <option value="8">8 (256 positions)</option>
+          <option value="10">10 (1024 positions)</option>
+        </select></label>
+      </div>
+      <div class="row">
+        <button type="button" data-scenario="td">Exemple du TD</button>
+        <button type="button" data-scenario="big">8 nœuds</button>
+        <button type="button" data-scenario="alone">1 nœud</button>
+      </div>
+      <label><input type="checkbox" id="showPred" checked> afficher les prédécesseurs</label>
+      <label><input type="checkbox" id="fingers"> finger table de Chord (O(log n))</label>
+
+      <h2>Faire entrer un nœud</h2>
+      <div class="row">
+        <input type="text" id="joinA" value="4002" placeholder="port, URL ou #id">
+        <span id="joinAId" class="muted"></span>
+      </div>
+      <div class="row">
+        via <select id="joinVia"></select>
+        <button type="button" id="join">join</button>
+      </div>
+      <label><input type="checkbox" id="badOrder"> mauvais ordre : <code>add</code> sur S avant la copie des clefs</label>
+      <div class="row">
+        <input type="text" id="joinB" placeholder="2ᵉ join simultané">
+        <span id="joinBId" class="muted"></span>
+      </div>
+
+      <h2>Clef</h2>
+      <div class="row">
+        <input type="text" id="key" value="Bob" placeholder="clef">
+        <input type="text" id="value" placeholder="valeur (= clef)">
+      </div>
+      <div id="hash"></div>
+      <div class="row">
+        depuis <select id="from"></select>
+      </div>
+      <div class="row">
+        <button type="button" id="lookup">lookup</button>
+        <button type="button" id="get">get</button>
+        <button type="button" id="put">put</button>
+      </div>
+
+      <div id="nodeInfo"></div>
+
+      <h2>Étapes</h2>
+      <ol id="steps"></ol>
+      <p class="muted">Clic sur un nœud : détail et panne. Flèches ← → ou espace pour avancer.</p>
+    </aside>
+  </div>
+
+  <script>
+    // <logique> : sans DOM, testable sous Node
+
+    // SHA-1 synchrone, pour fonctionner aussi en file:// (crypto.subtle exige un contexte sécurisé)
+    function sha1 (text) {
+      const message = new TextEncoder().encode(text)
+      const length = ((message.length + 9 + 63) >> 6) << 6
+      const buffer = new Uint8Array(length)
+      buffer.set(message)
+      buffer[message.length] = 0x80
+      const view = new DataView(buffer.buffer)
+      view.setUint32(length - 8, Math.floor(message.length / 0x20000000))
+      view.setUint32(length - 4, (message.length * 8) >>> 0)
+      const h = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0]
+      const w = new Uint32Array(80)
+      for (let offset = 0; offset < length; offset += 64) {
+        for (let i = 0; i < 16; i++) w[i] = view.getUint32(offset + 4 * i)
+        for (let i = 16; i < 80; i++) {
+          const x = w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]
+          w[i] = (x << 1) | (x >>> 31)
+        }
+        let [a, b, c, d, e] = h
+        for (let i = 0; i < 80; i++) {
+          let f, k
+          if (i < 20) { f = (b & c) | (~b & d); k = 0x5A827999 }
+          else if (i < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1 }
+          else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC }
+          else { f = b ^ c ^ d; k = 0xCA62C1D6 }
+          const t = (((a << 5) | (a >>> 27)) + f + e + k + w[i]) >>> 0
+          e = d; d = c; c = (b << 30) | (b >>> 2); b = a; a = t
+        }
+        h[0] = (h[0] + a) >>> 0; h[1] = (h[1] + b) >>> 0; h[2] = (h[2] + c) >>> 0
+        h[3] = (h[3] + d) >>> 0; h[4] = (h[4] + e) >>> 0
+      }
+      return h.map(x => x.toString(16).padStart(8, '0')).join('')
+    }
+
+    // Même calcul que getIdFromString dans index.js : les m derniers bits du SHA-1
+    function hashId (text, m) {
+      const bits = sha1(text).split('').map(c => parseInt(c, 16).toString(2).padStart(4, '0')).join('')
+      return parseInt(bits.slice(-m), 2)
+    }
+
+    // ]start, end], comme idIsInInterval dans index.js
+    function inInterval (id, start, end) {
+      return start < end ? id > start && id <= end : id > start || id <= end
+    }
+
+    function nodeUrl (input) {
+      const text = String(input).trim()
+      if (/^\d+$/.test(text)) return `http://localhost:${text}`
+      if (/^#\d+$/.test(text)) return text
+      return text
+    }
+
+    function nodeId (url, m) {
+      return url.startsWith('#') ? Number(url.slice(1)) % 2 ** m : hashId(url, m)
+    }
+
+    function shortName (url) {
+      if (url === 'CLI') return 'CLI'
+      const port = /^http:\/\/localhost:(\d+)$/.exec(url)
+      return port ? port[1] : url.replace(/^https?:\/\//, '')
+    }
+
+    function name (st, url) {
+      const node = st.nodes[url]
+      if (url === 'CLI') return 'CLI'
+      return node ? `N${node.id}` : shortName(url)
+    }
+
+    function liveNodes (st) {
+      return Object.values(st.nodes).filter(n => !n.dead).sort((a, b) => a.id - b.id)
+    }
+
+    // Responsable « idéal » : le premier nœud vivant à partir de id, en tournant
+    function idealSuccessor (st, id) {
+      const live = liveNodes(st)
+      return live.find(n => n.id >= id) ?? live[0]
+    }
+
+    function fingerTable (st, url) {
+      const node = st.nodes[url]
+      const size = 2 ** st.m
+      const table = []
+      for (let i = 0; i < st.m; i++) {
+        const start = (node.id + 2 ** i) % size
+        table.push({ i, start, url: idealSuccessor(st, start)?.url })
+      }
+      return table
+    }
+
+    // Construit directement un anneau cohérent, sans dérouler les join
+    function buildRing (m, urls, entries) {
+      const st = { m, nodes: {}, dropped: [] }
+      for (const url of urls) {
+        const id = nodeId(url, m)
+        const clash = Object.values(st.nodes).find(n => n.id === id)
+        if (clash) {
+          st.dropped.push(`${shortName(url)} (id ${id}, même id que ${shortName(clash.url)})`)
+          continue
+        }
+        st.nodes[url] = { url, id, succ: url, pred: url, db: {}, dead: false }
+      }
+      const live = liveNodes(st)
+      live.forEach((node, i) => {
+        node.succ = live[(i + 1) % live.length].url
+        node.pred = live[(i - 1 + live.length) % live.length].url
+      })
+      for (const [key, value] of entries) {
+        const holder = idealSuccessor(st, hashId(key, m))
+        if (holder) holder.db[key] = value
+      }
+      return st
+    }
+
+    function ringProblems (st) {
+      const problems = []
+      const live = liveNodes(st)
+      for (const node of live) {
+        const succ = st.nodes[node.succ]
+        const pred = st.nodes[node.pred]
+        if (succ.dead) problems.push(`successeur de N${node.id} : N${succ.id} est arrêté`)
+        else if (succ.pred !== node.url) problems.push(`N${node.id} → succ N${succ.id}, mais pred de N${succ.id} = N${st.nodes[succ.pred].id}`)
+        if (pred.dead) problems.push(`prédécesseur de N${node.id} : N${pred.id} est arrêté`)
+        else if (pred.succ !== node.url) problems.push(`N${node.id} → pred N${pred.id}, mais succ de N${pred.id} = N${st.nodes[pred.succ].id}`)
+      }
+      if (live.length) {
+        const seen = new Set()
+        let url = live[0].url
+        while (!seen.has(url) && st.nodes[url] && !st.nodes[url].dead) {
+          seen.add(url)
+          url = st.nodes[url].succ
+        }
+        if (seen.size < live.length) problems.push(`en suivant les successeurs, on ne voit que ${seen.size} nœud(s) sur ${live.length}`)
+      }
+      const keys = new Set(Object.values(st.nodes).flatMap(n => Object.keys(n.db)))
+      for (const key of keys) {
+        const id = hashId(key, st.m)
+        const holder = idealSuccessor(st, id)
+        if (holder && !(key in holder.db)) problems.push(`clef « ${key} » (id ${id}) absente chez son responsable N${holder.id}`)
+      }
+      return problems
+    }
+
+    // Une requête qui va de nœud en nœud jusqu'au responsable de keyId.
+    // Chaque saut est une étape ; renvoie { url, hops, value } ou { error, hops }.
+    function * route (st, { from, start, key, keyId, op, value, label, fingers }) {
+      const visited = new Set()
+      let prev = from
+      let cur = start
+      let hops = 0
+      while (true) {
+        const node = st.nodes[cur]
+        const msg = { from: prev, to: cur, label }
+        hops++
+        if (!node || node.dead) {
+          yield { text: `${name(st, prev)} → ${name(st, cur)} : pas de réponse, le nœud est arrêté. La requête échoue.`, msgs: [{ ...msg, failed: true }], at: cur, keyId, level: 'err' }
+          return { error: 'injoignable', hops }
+        }
+        if (visited.has(cur)) {
+          yield { text: `Retour sur N${node.id} : la requête tourne en boucle. Elle continuerait jusqu'à --hops (64 sauts) puis erreur 508.`, msgs: [msg], at: cur, keyId, level: 'err' }
+          return { error: 508, hops }
+        }
+        visited.add(cur)
+        const predId = st.nodes[node.pred].id
+        const here = `N${node.id} : ${keyId} ∈ ]${predId}, ${node.id}]`
+        if (inInterval(keyId, predId, node.id)) {
+          const total = `${hops} requête${hops > 1 ? 's' : ''} HTTP`
+          if (op === 'get') {
+            const found = key in node.db
+            yield { text: `${here} → responsable. ${found ? `Renvoie « ${node.db[key]} »` : 'Clef absente : 404'} (${total}).`, msgs: [msg], at: cur, keyId, level: found ? 'ok' : 'err' }
+            return { url: cur, hops, value: found ? node.db[key] : undefined }
+          }
+          if (op === 'put') {
+            node.db[key] = value
+            yield { text: `${here} → responsable : stocke ${key} = « ${value} » (${total}).`, msgs: [msg], at: cur, keyId, level: 'ok' }
+            return { url: cur, hops }
+          }
+          yield { text: `${here} → responsable : renvoie son URL ${shortName(cur)} (${total}).`, msgs: [msg], at: cur, keyId, level: 'ok' }
+          return { url: cur, hops }
+        }
+        let next = node.succ
+        let why = `transmet à son successeur N${st.nodes[next].id}`
+        if (fingers && !inInterval(keyId, node.id, st.nodes[node.succ].id)) {
+          const table = fingerTable(st, cur)
+          for (let i = table.length - 1; i >= 0; i--) {
+            const target = st.nodes[table[i].url]
+            if (target.url !== cur && inInterval(target.id, node.id, keyId) && target.id !== keyId) {
+              next = target.url
+              why = `plus grand raccourci avant ${keyId} : finger +${2 ** i} → N${target.id}`
+              break
+            }
+          }
+        }
+        yield { text: `${here.replace('∈', '∉')} → ${why}.`, msgs: [msg], at: cur, keyId, fingersOf: fingers ? cur : null }
+        prev = cur
+        cur = next
+      }
+    }
+
+    // POST /add sur target : la règle du protocole, sans propagation
+    function * add (st, target, newUrl) {
+      const node = st.nodes[target]
+      const x = st.nodes[newUrl].id
+      const msg = { from: newUrl, to: target, label: 'POST /add' }
+      if (node.dead) {
+        yield { text: `N${x} → ${name(st, target)} : POST /add sans réponse, le nœud est arrêté.`, msgs: [{ ...msg, failed: true }], level: 'err' }
+        return
+      }
+      const changes = []
+      if (inInterval(x, node.id, st.nodes[node.succ].id)) {
+        changes.push(`${x} ∈ ]${node.id}, ${st.nodes[node.succ].id}] → successor = N${x}`)
+        node.succ = newUrl
+      }
+      if (inInterval(x, st.nodes[node.pred].id, node.id)) {
+        changes.push(`${x} ∈ ]${st.nodes[node.pred].id}, ${node.id}] → predecessor = N${x}`)
+        node.pred = newUrl
+      }
+      yield { text: `N${x} → N${node.id} : POST /add. ${changes.length ? `N${node.id} : ${changes.join(' ; ')}.` : `N${node.id} est déjà à jour.`}`, msgs: [msg], at: target }
+    }
+
+    function * join (st, newUrl, via, { badOrder = false, fingers = false } = {}) {
+      const id = nodeId(newUrl, st.m)
+      st.nodes[newUrl] = { url: newUrl, id, succ: newUrl, pred: newUrl, db: {}, dead: false }
+      const n = `N${id}`
+      yield { text: `${n} (${shortName(newUrl)}) démarre seul : il est son propre successeur et prédécesseur, responsable de ]${id}, ${id}] = tout l'anneau.`, at: newUrl }
+      yield { text: `CLI → ${n} : POST /join {url: ${shortName(via)}}`, msgs: [{ from: 'CLI', to: newUrl, label: 'POST /join' }], at: newUrl }
+
+      const found = yield * route(st, { from: newUrl, start: via, key: newUrl, keyId: id, op: 'lookup', label: 'GET /lookup', fingers })
+      if (found.error) {
+        yield { text: `${n} : le lookup a échoué, join abandonné.`, level: 'err' }
+        return
+      }
+      const s = found.url
+      yield { text: `Réponse à ${n} : le responsable de la position ${id} est N${st.nodes[s].id}. Ce sera son successeur S.`, msgs: [{ from: via, to: newUrl, label: `S = N${st.nodes[s].id}`, reply: true }], at: s }
+
+      const p = st.nodes[s].pred
+      yield { text: `${n} → N${st.nodes[s].id} : GET /config/predecessor → N${st.nodes[p].id}. Ce sera son prédécesseur P. À demander avant le add sur S !`, msgs: [{ from: newUrl, to: s, label: 'GET /config/predecessor' }], at: s }
+
+      if (badOrder) yield * add(st, s, newUrl)
+
+      const pId = st.nodes[p].id
+      const keys = Object.keys(st.nodes[s].db)
+      const mine = keys.filter(key => inInterval(hashId(key, st.m), pId, id))
+      yield { text: `${n} → N${st.nodes[s].id} : GET /keys → [${keys.join(', ')}]. À copier, celles dont l'id est dans ]${pId}, ${id}] : ${mine.length ? mine.map(k => `${k} (${hashId(k, st.m)})`).join(', ') : 'aucune'}.`, msgs: [{ from: newUrl, to: s, label: 'GET /keys' }], at: s }
+
+      for (const key of mine) {
+        const keyId = hashId(key, st.m)
+        if (!badOrder) {
+          st.nodes[newUrl].db[key] = st.nodes[s].db[key]
+          yield { text: `${n} → N${st.nodes[s].id} : GET /db/${key} → copie de « ${key} » chez ${n}. Elle reste aussi chez N${st.nodes[s].id}.`, msgs: [{ from: newUrl, to: s, label: `GET /db/${key}` }], at: newUrl, keyId }
+        } else {
+          const got = yield * route(st, { from: newUrl, start: s, key, keyId, op: 'get', label: `GET /db/${key}` })
+          if (got.value !== undefined) {
+            st.nodes[newUrl].db[key] = got.value
+            yield { text: `${n} copie « ${key} ».`, at: newUrl, keyId }
+          } else {
+            yield { text: `${n} ne récupère pas « ${key} » : N${st.nodes[s].id} n'est plus responsable de ${keyId} depuis le add.`, at: newUrl, keyId, level: 'err' }
+          }
+        }
+      }
+
+      if (!badOrder) yield * add(st, s, newUrl)
+      yield * add(st, p, newUrl)
+
+      st.nodes[newUrl].succ = s
+      st.nodes[newUrl].pred = p
+      yield { text: `${n} : successor = N${st.nodes[s].id}, predecessor = N${pId}.`, at: newUrl }
+
+      const problems = ringProblems(st)
+      yield {
+        text: `${n} → CLI : OK. ${problems.length ? `Mais l'anneau est incohérent : ${problems[0]}.` : 'Anneau cohérent.'}`,
+        msgs: [{ from: newUrl, to: 'CLI', label: 'OK', reply: true }],
+        at: newUrl,
+        level: problems.length ? 'err' : 'ok',
+      }
+    }
+
+    // Deux opérations en parallèle, une étape chacune à tour de rôle
+    function * interleave (...generators) {
+      const active = [...generators]
+      while (active.length) {
+        for (const generator of [...active]) {
+          const { value, done } = generator.next()
+          if (done) active.splice(active.indexOf(generator), 1)
+          else yield value
+        }
+      }
+    }
+
+    function * tagged (generator, actor) {
+      for (const step of generator) {
+        yield { ...step, actor, msgs: step.msgs?.map(msg => ({ ...msg, actor })) }
+      }
+    }
+
+    // Déroule une opération et garde une copie de l'anneau après chaque étape
+    function record (base, title, makeGenerator) {
+      const st = structuredClone(base)
+      const frames = [{ step: { text: `${title} : état de départ.` }, st: structuredClone(st) }]
+      const generator = makeGenerator(st)
+      for (let r = generator.next(); !r.done && frames.length < 400; r = generator.next()) {
+        frames.push({ step: r.value, st: structuredClone(st) })
+      }
+      return frames
+    }
+
+    // </logique>
+  </script>
+
+  <script>
+    const svg = document.getElementById('ring')
+    const $ = id => document.getElementById(id)
+    const R = 330
+    const NODE_R = 22
+    const CLI_POS = [-400, 420]
+
+    const names = ['Bob', 'Alice', 'Heidi', 'Charlie', 'Dave', 'Eve', 'Mallory', 'Oscar', 'Trent', 'Peggy']
+    const scenarios = {
+      td: () => ({ urls: ['4000', '4001'].map(nodeUrl), keys: ['Bob', 'Alice', 'Heidi'] }),
+      big: () => ({ urls: [4000, 4001, 4002, 4003, 4004, 4005, 4007, 4008, 4009, 4010].map(nodeUrl), keys: names, max: 8 }),
+      alone: () => ({ urls: [nodeUrl('4000')], keys: [] }),
+    }
+
+    let base = null
+    // Opération en cours de déroulé : { frames, i }
+    let op = null
+    let selected = null
+    let notice = ''
+
+    function current () {
+      return op ? op.frames[op.i].st : base
+    }
+
+    function latest () {
+      return op ? op.frames.at(-1).st : base
+    }
+
+    function commit () {
+      if (op) base = op.frames.at(-1).st
+      op = null
+    }
+
+    function loadScenario (key) {
+      const m = Number($('m').value)
+      const { urls, keys, max } = scenarios[key]()
+      let st = buildRing(m, urls, keys.map(k => [k, k]))
+      if (max) {
+        const kept = liveNodes(st).slice(0, max).map(n => n.url)
+        st = buildRing(m, urls.filter(u => kept.includes(u)), keys.map(k => [k, k]))
+      }
+      base = st
+      op = null
+      selected = null
+      notice = st.dropped.length ? `Collision, non ajouté : ${st.dropped.join(', ')}` : ''
+      render()
+    }
+
+    // Changer m recalcule toutes les positions de l'anneau actuel
+    function changeM () {
+      commit()
+      const m = Number($('m').value)
+      const entries = new Map()
+      for (const node of Object.values(base.nodes)) {
+        for (const [k, v] of Object.entries(node.db)) entries.set(k, v)
+      }
+      base = buildRing(m, Object.values(base.nodes).filter(n => !n.dead).map(n => n.url), [...entries])
+      notice = base.dropped.length ? `Collision, non ajouté : ${base.dropped.join(', ')}` : ''
+      selected = null
+      render()
+    }
+
+    function run (title, makeGenerator) {
+      commit()
+      op = { frames: record(base, title, makeGenerator), i: 0 }
+      notice = ''
+      render()
+    }
+
+    function go (i) {
+      if (!op) return
+      op.i = Math.max(0, Math.min(op.frames.length - 1, i))
+      render()
+    }
+
+    // ---------- dessin ----------
+
+    function esc (text) {
+      return String(text).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+    }
+
+    function color (id, m) {
+      return `hsl(${(id * 137.508 * 64 / 2 ** m) % 360}, 65%, 42%)`
+    }
+
+    function angle (pos, m) {
+      return -Math.PI / 2 + 2 * Math.PI * pos / 2 ** m
+    }
+
+    function point (pos, m, r = R) {
+      const a = angle(pos, m)
+      return [r * Math.cos(a), r * Math.sin(a)]
+    }
+
+    function f (x) {
+      return x.toFixed(1)
+    }
+
+    // Arc de ]a, b] au rayon r
+    function arc (a, b, m, r) {
+      const size = 2 ** m
+      const span = ((b - a) % size + size) % size || size
+      if (span === size) return `<circle r="${r}" fill="none"`
+      const [x1, y1] = point(a + 0.2, m, r)
+      const [x2, y2] = point(b, m, r)
+      return `<path d="M${f(x1)} ${f(y1)} A${r} ${r} 0 ${span - 0.2 > size / 2 ? 1 : 0} 1 ${f(x2)} ${f(y2)}" fill="none"`
+    }
+
+    function covered (a, b, m) {
+      const size = 2 ** m
+      const set = new Set()
+      let p = a
+      do {
+        p = (p + 1) % size
+        set.add(p)
+      } while (p !== b)
+      return set
+    }
+
+    function endpoint (st, url) {
+      return url === 'CLI' ? CLI_POS : point(st.nodes[url].id, st.m)
+    }
+
+    // Point de contrôle au milieu du trajet de a vers b le long de l'anneau (sens horaire, ou
+    // antihoraire pour les prédécesseurs) : deux nœuds opposés ne superposent pas leurs flèches
+    function ringControl (a, b, m, k, counterClockwise = false) {
+      const size = 2 ** m
+      const span = counterClockwise ? ((a - b) % size + size) % size : ((b - a) % size + size) % size
+      const mid = counterClockwise ? a - span / 2 : a + span / 2
+      return point(mid, m, R * k * Math.max(Math.cos(Math.PI * span / size), 0.35))
+    }
+
+    // Courbe de p0 vers p2, de point de contrôle c (par défaut tirée vers le centre d'un facteur bend)
+    function curve (p0, p2, bend, trimStart = NODE_R + 4, trimEnd = NODE_R + 8) {
+      const c = Array.isArray(bend) ? bend : [(p0[0] + p2[0]) / 2 * bend, (p0[1] + p2[1]) / 2 * bend]
+      const towards = (p, q, d) => {
+        const len = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1
+        return [p[0] + (q[0] - p[0]) * d / len, p[1] + (q[1] - p[1]) * d / len]
+      }
+      const s = towards(p0, c, trimStart)
+      const e = towards(p2, c, trimEnd)
+      const mid = [0.25 * s[0] + 0.5 * c[0] + 0.25 * e[0], 0.25 * s[1] + 0.5 * c[1] + 0.25 * e[1]]
+      return { d: `M${f(s[0])} ${f(s[1])} Q${f(c[0])} ${f(c[1])} ${f(e[0])} ${f(e[1])}`, mid }
+    }
+
+    function render () {
+      const st = current()
+      const frame = op ? op.frames[op.i] : null
+      const step = frame?.step ?? {}
+      const m = st.m
+      const size = 2 ** m
+      const nodes = Object.values(st.nodes).sort((a, b) => a.id - b.id)
+      const out = []
+
+      out.push(`<defs>
+        ${['succ', 'pred', 'msgA', 'msgB', 'fail', 'finger'].map(k => {
+          const w = ['msgA', 'msgB', 'fail'].includes(k) ? 4 : 6
+          return `<marker id="h-${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="${w}" markerHeight="${w}" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="m-${k}"/></marker>`
+        }).join('')}
+        <style>
+          .m-succ { fill: #777 } .m-pred { fill: #aaa } .m-msgA { fill: var(--accent) } .m-msgB { fill: var(--accent2) } .m-fail { fill: var(--err) } .m-finger { fill: var(--finger) }
+        </style>
+      </defs>`)
+
+      // Anneau et graduations
+      out.push(`<circle r="${R}" fill="none" stroke="var(--ring)" stroke-width="2"/>`)
+      const labelEvery = size / 8
+      for (let p = 0; p < size; p++) {
+        const major = p % labelEvery === 0
+        if (size > 256 && !major && p % 4) continue
+        const [x1, y1] = point(p, m, R - (major ? 10 : 4))
+        const [x2, y2] = point(p, m, R + (major ? 10 : 4))
+        out.push(`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="#bbb" stroke-width="${major ? 2 : 1}"/>`)
+        if (major) {
+          const [x, y] = point(p, m, R - 30)
+          out.push(`<text x="${f(x)}" y="${f(y)}" text-anchor="middle" dominant-baseline="middle" font-size="16" fill="#999">${p}</text>`)
+        }
+      }
+
+      // Intervalles de responsabilité ]pred, nœud], sur des couches distinctes s'ils se chevauchent
+      const layers = []
+      for (const node of nodes) {
+        if (node.dead) continue
+        const pred = st.nodes[node.pred]
+        const cells = covered(pred.id, node.id, m)
+        let layer = 0
+        while (layers[layer]?.some(other => [...cells].some(c => other.has(c)))) layer++
+        ;(layers[layer] ??= []).push(cells)
+        out.push(`${arc(pred.id, node.id, m, R - 16 * layer)} stroke="${color(node.id, m)}" stroke-width="9" stroke-linecap="butt" opacity="0.85"/>`)
+      }
+
+      // Liens successeur et prédécesseur
+      for (const node of nodes) {
+        if (node.dead) continue
+        const p0 = point(node.id, m)
+        if (node.succ !== node.url) {
+          const succ = st.nodes[node.succ]
+          const { d } = curve(p0, point(succ.id, m), ringControl(node.id, succ.id, m, 0.78))
+          out.push(`<path d="${d}" fill="none" stroke="#777" stroke-width="2.5" marker-end="url(#h-succ)"/>`)
+        }
+        if ($('showPred').checked && node.pred !== node.url) {
+          const pred = st.nodes[node.pred]
+          const { d } = curve(p0, point(pred.id, m), ringControl(node.id, pred.id, m, 0.6, true))
+          out.push(`<path d="${d}" fill="none" stroke="#aaa" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#h-pred)"/>`)
+        }
+      }
+
+      // Finger table du nœud sélectionné, ou du nœud qui traite la requête
+      const fingersOf = step.fingersOf ?? ($('fingers').checked && selected && st.nodes[selected] && !st.nodes[selected].dead ? selected : null)
+      if (fingersOf) {
+        const p0 = point(st.nodes[fingersOf].id, m)
+        const seen = new Set()
+        for (const { i, url } of fingerTable(st, fingersOf)) {
+          if (!url || url === fingersOf || seen.has(url)) continue
+          seen.add(url)
+          const { d, mid } = curve(p0, point(st.nodes[url].id, m), ringControl(st.nodes[fingersOf].id, st.nodes[url].id, m, 0.9))
+          out.push(`<path d="${d}" fill="none" stroke="var(--finger)" stroke-width="2" stroke-dasharray="2 5" stroke-linecap="round" marker-end="url(#h-finger)"/>`)
+          out.push(`<text x="${f(mid[0])}" y="${f(mid[1])}" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="var(--finger)" stroke="var(--bg)" stroke-width="4" paint-order="stroke">+${2 ** i}</text>`)
+        }
+      }
+
+      // Clefs, regroupées par position ; une clef hors de l'intervalle de son détenteur est une copie
+      const byKey = new Map()
+      for (const node of nodes) {
+        for (const key of Object.keys(node.db)) {
+          if (!byKey.has(key)) byKey.set(key, [])
+          const keyId = hashId(key, m)
+          const copy = node.dead || !inInterval(keyId, st.nodes[node.pred].id, node.id)
+          byKey.get(key).push({ node, copy })
+        }
+      }
+      const byPos = new Map()
+      for (const [key, holders] of byKey) {
+        const keyId = hashId(key, m)
+        if (!byPos.has(keyId)) byPos.set(keyId, [])
+        byPos.get(keyId).push({ key, holders })
+      }
+      for (const [keyId, entries] of byPos) {
+        entries.forEach(({ key, holders }, j) => {
+          const r = R - 62 - 46 * j
+          const [x, y] = point(keyId, m, r)
+          holders.forEach(({ node, copy }, k) => {
+            const dx = (k - (holders.length - 1) / 2) * 16
+            const fill = node.dead ? '#bbb' : copy ? 'var(--bg)' : color(node.id, m)
+            out.push(`<rect x="${f(x + dx - 6)}" y="${f(y - 18)}" width="12" height="12" fill="${fill}" stroke="${node.dead ? '#999' : color(node.id, m)}" stroke-width="2"><title>${esc(key)} (id ${keyId}) chez N${node.id}${copy ? ' (copie)' : ''}</title></rect>`)
+          })
+          out.push(`<text x="${f(x)}" y="${f(y + 10)}" text-anchor="middle" font-size="17" fill="var(--fg)" stroke="var(--bg)" stroke-width="4" paint-order="stroke">${esc(key)} <tspan fill="#999" font-size="13">${keyId}</tspan></text>`)
+        })
+      }
+
+      // Position de la clef recherchée
+      if (Number.isInteger(step.keyId)) {
+        const [x1, y1] = point(step.keyId, m, R - 18)
+        const [x2, y2] = point(step.keyId, m, R + 18)
+        const [tx, ty] = point(step.keyId, m, R + 92)
+        out.push(`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="var(--accent)" stroke-width="5"/>`)
+        out.push(`<text x="${f(tx)}" y="${f(ty)}" text-anchor="middle" dominant-baseline="middle" font-size="17" font-weight="600" fill="var(--accent)">clef ${step.keyId}</text>`)
+      }
+
+      // Nœuds
+      for (const node of nodes) {
+        const [x, y] = point(node.id, m)
+        const [lx, ly] = point(node.id, m, R + 52)
+        if (node.url === step.at) out.push(`<circle cx="${f(x)}" cy="${f(y)}" r="${NODE_R + 9}" fill="none" stroke="var(--gold)" stroke-width="6"/>`)
+        if (node.url === selected) out.push(`<circle cx="${f(x)}" cy="${f(y)}" r="${NODE_R + 6}" fill="none" stroke="var(--fg)" stroke-width="2" stroke-dasharray="4 3"/>`)
+        out.push(`<g data-url="${esc(node.url)}" style="cursor:pointer">
+          <circle cx="${f(x)}" cy="${f(y)}" r="${NODE_R}" fill="${node.dead ? '#ccc' : color(node.id, m)}" stroke="var(--bg)" stroke-width="2"/>
+          <text x="${f(x)}" y="${f(y)}" text-anchor="middle" dominant-baseline="central" font-size="${node.id > 99 ? 15 : 19}" font-weight="700" fill="${node.dead ? '#666' : '#fff'}">${node.dead ? '✝' : node.id}</text>
+          <text x="${f(lx)}" y="${f(ly)}" text-anchor="middle" dominant-baseline="middle" font-size="18" fill="var(--muted)">${node.dead ? `✝ ${node.id} ` : ''}${esc(shortName(node.url))}</text>
+        </g>`)
+      }
+
+      // Messages de l'étape en cours
+      let usesCli = false
+      for (const msg of step.msgs ?? []) {
+        if (msg.from === msg.to) continue
+        if (msg.from === 'CLI' || msg.to === 'CLI') usesCli = true
+        const p0 = endpoint(st, msg.from)
+        const p2 = endpoint(st, msg.to)
+        const trim = msg.from === 'CLI' ? 40 : NODE_R + 4
+        const { d, mid } = curve(p0, p2, 0.3, trim, msg.to === 'CLI' ? 44 : NODE_R + 10)
+        const kind = msg.failed ? 'fail' : msg.actor === 'B' ? 'msgB' : 'msgA'
+        const stroke = msg.failed ? 'var(--err)' : msg.actor === 'B' ? 'var(--accent2)' : 'var(--accent)'
+        out.push(`<path d="${d}" fill="none" stroke="${stroke}" stroke-width="5" ${msg.reply ? 'stroke-dasharray="10 7"' : ''} marker-end="url(#h-${kind})"/>`)
+        out.push(`<text x="${f(mid[0])}" y="${f(mid[1])}" text-anchor="middle" dominant-baseline="middle" font-size="20" font-weight="600" fill="${stroke}" stroke="var(--bg)" stroke-width="6" paint-order="stroke">${esc(msg.label)}</text>`)
+      }
+      if (usesCli) {
+        out.push(`<rect x="${CLI_POS[0] - 38}" y="${CLI_POS[1] - 22}" width="76" height="44" rx="6" fill="var(--fg)"/>`)
+        out.push(`<text x="${CLI_POS[0]}" y="${CLI_POS[1]}" text-anchor="middle" dominant-baseline="central" font-size="18" font-weight="700" fill="var(--bg)">CLI</text>`)
+      }
+
+      out.push(`<text x="-460" y="-440" font-size="18" fill="#999">m = ${m}, positions 0 à ${size - 1}</text>`)
+      svg.innerHTML = out.join('')
+
+      renderStepper(step)
+      renderPanel(st)
+    }
+
+    function renderStepper (step) {
+      $('stepText').className = step.level ?? ''
+      if (!op) {
+        $('stepText').textContent = notice || 'Lancez un join, un lookup, un get ou un put depuis le panneau.'
+        $('stepCount').textContent = ''
+      } else {
+        const prefix = step.actor ? `[${step.actor}] ` : ''
+        $('stepText').textContent = prefix + step.text
+        $('stepCount').textContent = `${op.i} / ${op.frames.length - 1}`
+      }
+      $('prev').disabled = !op || op.i === 0
+      $('next').disabled = !op || op.i === op.frames.length - 1
+      $('finish').disabled = $('next').disabled
+
+      const list = $('steps')
+      list.innerHTML = ''
+      op?.frames.forEach(({ step }, i) => {
+        if (i === 0) return
+        const li = document.createElement('li')
+        li.textContent = (step.actor ? `[${step.actor}] ` : '') + step.text
+        li.className = i === op.i ? 'current' : i > op.i ? 'future' : ''
+        if (step.level === 'err') li.classList.add('err')
+        li.onclick = () => go(i)
+        list.append(li)
+        if (i === op.i) requestAnimationFrame(() => { list.scrollTop = li.offsetTop - list.clientHeight / 2 })
+      })
+    }
+
+    function fillSelect (select, st) {
+      const value = select.value
+      select.innerHTML = liveNodes(st).map(n => `<option value="${esc(n.url)}">N${n.id} (${esc(shortName(n.url))})</option>`).join('')
+      if ([...select.options].some(o => o.value === value)) select.value = value
+    }
+
+    function renderPanel (st) {
+      const end = latest()
+      fillSelect($('joinVia'), end)
+      fillSelect($('from'), end)
+
+      const problems = ringProblems(st)
+      $('health').innerHTML = problems.length
+        ? `<div class="err">⚠ Anneau incohérent</div><ul class="err" style="margin:4px 0;padding-left:20px;font-size:14px">${problems.map(p => `<li>${esc(p)}</li>`).join('')}</ul>`
+        : `<div class="ok">✔ Anneau cohérent (${liveNodes(st).length} nœud${liveNodes(st).length > 1 ? 's' : ''})</div>`
+
+      for (const which of ['A', 'B']) {
+        const text = $(`join${which}`).value.trim()
+        if (!text) {
+          $(`join${which}Id`).textContent = ''
+          continue
+        }
+        const url = nodeUrl(text)
+        const id = nodeId(url, end.m)
+        const clash = Object.values(end.nodes).find(n => n.id === id)
+        $(`join${which}Id`).textContent = `→ id ${id}${clash ? ` ⚠ collision avec ${shortName(clash.url)}` : ''}`
+      }
+
+      renderHash(end)
+      renderNodeInfo(st)
+    }
+
+    function renderHash (st) {
+      const key = $('key').value
+      const digest = sha1(key)
+      const m = st.m
+      const tailHex = digest.slice(-4)
+      const bits = tailHex.split('').map(c => parseInt(c, 16).toString(2).padStart(4, '0')).join('')
+      const id = hashId(key, m)
+      const holder = idealSuccessor(st, id)
+      $('hash').innerHTML =
+        `sha1("${esc(key)}") =\n${digest.slice(0, -4)}<b>${tailHex}</b>\n` +
+        `…${bits.slice(0, 16 - m)}<b>${bits.slice(16 - m)}</b>  (${m} derniers bits)\n` +
+        `→ id <b>${id}</b>${holder ? `, responsable N${holder.id} (${esc(shortName(holder.url))})` : ''}`
+    }
+
+    function renderNodeInfo (st) {
+      const box = $('nodeInfo')
+      const node = selected && st.nodes[selected]
+      if (!node) {
+        box.innerHTML = ''
+        return
+      }
+      const pred = st.nodes[node.pred]
+      const succ = st.nodes[node.succ]
+      const size = 2 ** st.m
+      const span = ((node.id - pred.id) % size + size) % size || size
+      const keys = Object.keys(node.db).map(k => {
+        const copy = !inInterval(hashId(k, st.m), pred.id, node.id)
+        return `${esc(k)} (${hashId(k, st.m)})${copy ? ' <span class="muted">copie</span>' : ''}`
+      })
+      let html = `<h2>Nœud N${node.id}${node.dead ? ' ✝' : ''}</h2>
+        <div>${esc(node.url)}</div>
+        <div>prédécesseur N${pred.id}, successeur N${succ.id}</div>
+        <div>responsable de ]${pred.id}, ${node.id}] : ${span} position${span > 1 ? 's' : ''}</div>
+        <div>clefs : ${keys.join(', ') || '<span class="muted">aucune</span>'}</div>
+        <div class="row"><button type="button" id="kill">${node.dead ? 'Relancer (pm2 restart)' : 'Arrêter (pm2 stop)'}</button></div>`
+      if ($('fingers').checked && !node.dead) {
+        html += `<table><tr><th>i</th><th>début</th><th>finger</th></tr>${fingerTable(st, node.url).map(({ i, start, url }) =>
+          `<tr><td>${i + 1}</td><td>${node.id} + ${2 ** i} = ${start}</td><td>N${st.nodes[url].id}</td></tr>`).join('')}</table>`
+      }
+      box.innerHTML = html
+      $('kill').onclick = () => {
+        commit()
+        const target = base.nodes[selected]
+        // Un nœud relancé a tout oublié, comme avec pm2 restart
+        if (target.dead) Object.assign(target, { dead: false, succ: target.url, pred: target.url, db: {} })
+        else target.dead = true
+        notice = target.dead
+          ? `N${target.id} est arrêté : ses clefs sont perdues et son prédécesseur pointe dans le vide.`
+          : `N${target.id} est relancé seul, sans voisins ni clefs : il faut refaire son join.`
+        render()
+      }
+    }
+
+    // ---------- actions ----------
+
+    function startJoin () {
+      const end = latest()
+      const via = $('joinVia').value
+      const urls = [$('joinA').value, $('joinB').value].map(t => t.trim()).filter(Boolean).map(nodeUrl)
+      if (!urls.length || !via) return
+      const ids = new Set()
+      for (const url of urls) {
+        const id = nodeId(url, end.m)
+        const clash = Object.values(end.nodes).find(n => n.id === id)
+        if (end.nodes[url] || clash || ids.has(id)) {
+          commit()
+          notice = `Impossible : ${shortName(url)} a l'id ${id}, déjà pris. Que devrait faire join ? (question 7)`
+          render()
+          return
+        }
+        ids.add(id)
+      }
+      const opts = { badOrder: $('badOrder').checked }
+      if (urls.length === 1) {
+        run(`join de N${nodeId(urls[0], end.m)} via N${end.nodes[via].id}${opts.badOrder ? ' (mauvais ordre)' : ''}`, st => join(st, urls[0], via, opts))
+      } else {
+        run(`join simultanés de N${nodeId(urls[0], end.m)} [A] et N${nodeId(urls[1], end.m)} [B]`, st =>
+          interleave(tagged(join(st, urls[0], via, opts), 'A'), tagged(join(st, urls[1], via, opts), 'B')))
+      }
+      $('joinA').value = ''
+      $('joinB').value = ''
+    }
+
+    function startRequest (kind) {
+      const end = latest()
+      const key = $('key').value
+      const from = $('from').value
+      if (!key || !from) return
+      const value = $('value').value || key
+      const keyId = hashId(key, end.m)
+      const fingers = $('fingers').checked
+      const label = { lookup: `GET /lookup/${key}`, get: `GET /db/${key}`, put: `PUT /db/${key}` }[kind]
+      run(`${kind} ${key} (id ${keyId}) depuis N${end.nodes[from].id}${fingers ? ', avec finger table' : ''}`, function * (st) {
+        yield { text: `${kind} ${key} : id = les ${st.m} derniers bits de sha1("${key}") = ${keyId}.`, keyId }
+        yield * route(st, { from: 'CLI', start: from, key, keyId, op: kind, value, label, fingers })
+      })
+    }
+
+    svg.addEventListener('click', event => {
+      const g = event.target.closest('[data-url]')
+      selected = g ? g.dataset.url : null
+      render()
+    })
+    document.querySelectorAll('[data-scenario]').forEach(b => { b.onclick = () => loadScenario(b.dataset.scenario) })
+    $('m').onchange = changeM
+    $('showPred').onchange = render
+    $('fingers').onchange = render
+    $('join').onclick = startJoin
+    $('lookup').onclick = () => startRequest('lookup')
+    $('get').onclick = () => startRequest('get')
+    $('put').onclick = () => startRequest('put')
+    $('prev').onclick = () => go(op.i - 1)
+    $('next').onclick = () => go(op.i + 1)
+    $('finish').onclick = () => go(op.frames.length - 1)
+    for (const id of ['key', 'joinA', 'joinB']) $(id).oninput = () => renderPanel(current())
+    $('key').onkeydown = e => { if (e.key === 'Enter') startRequest('lookup') }
+    $('joinA').onkeydown = e => { if (e.key === 'Enter') startJoin() }
+
+    // Les télécommandes de présentation envoient PageDown / PageUp
+    document.addEventListener('keydown', event => {
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName) || !op) return
+      if (['ArrowRight', 'PageDown', ' '].includes(event.key)) go(op.i + 1)
+      else if (['ArrowLeft', 'PageUp'].includes(event.key)) go(op.i - 1)
+      else if (event.key === 'End') go(op.frames.length - 1)
+      else if (event.key === 'Home') go(0)
+      else return
+      event.preventDefault()
+    })
+
+    loadScenario('td')
+  </script>
+</body>
+</html>
